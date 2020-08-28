@@ -3,6 +3,7 @@ oauth2client
 selenium
 tenacity
 pytest
+pytest-html
 black
 easelenium
 flake8
@@ -15,3 +16,8 @@ jupyter
 jupyter_nbextensions_configurator
 jupyter_contrib_nbextensions
 xlrd
+tqdm
+jupyter-kite
+yfinance
+loguru
+tabulate

@@ -6,7 +6,7 @@ import re
 
 NOT_NA_COLUMNS = [
     "Autom. Abstandsregelung",
-    "Fernlichtassistent",
+    # "Fernlichtassistent", NOTE: Tesla doesn't have it
     "Regensensor",
     "Lichtsensor",
     # "Fußgängererkennung",
@@ -26,7 +26,7 @@ class Column(object):
     ADAC_PAKET = "Klassenübliche Ausstattung nach ADAC-Vorgabe"
     ACCELERATION = "Beschleunigung 0-100km/h"
     FUEL_TANK_SIZE = "Tankgröße"
-    CONSUPTION_CITY_NEFZ = "Verbrauch Innerorts (NEFZ)"
+    CONSUPTION_TOTAL_NEFZ = "Verbrauch Gesamt (NEFZ)"
     CONSUPTION_COMBINED_WLTP = "Verbrauch nach WLTP kombiniert"
     # New columns:
     NAME = "name"
@@ -59,6 +59,14 @@ Länge
 Kofferraumvolumen normal
 Kofferraumvolumen dachhoch mit umgeklappter Rücksitzbank
 Bodenfreiheit maximal
+Fahrzeugpreis für die Berechnung
+Wertverlust
+Betriebskosten
+Fixkosten
+Werkstattkosten
+KFZ-Steuer pro Jahr
+Haftpflichtbeitrag 100%
+Vollkaskobetrag 100% 500 Euro SB
 """.strip().splitlines() + [
     Column.COSTS_FIX,
     Column.COSTS_OPERATING,
@@ -67,7 +75,7 @@ Bodenfreiheit maximal
     Column.PRICE,
     Column.ACCELERATION,
     Column.FUEL_TANK_SIZE,
-    Column.CONSUPTION_CITY_NEFZ,
+    Column.CONSUPTION_TOTAL_NEFZ,
     Column.CONSUPTION_COMBINED_WLTP,
 ]
 
@@ -190,23 +198,43 @@ def _fix_missing_values_by_adding_avg(df):
     return df
 
 
+def _filter_by_models(df, names):
+    return df[
+        df[Column.NAME].apply(
+            lambda x: any([_is_model_name(x, name) for name in names])
+        )
+    ]
+
+
 def _get_df_with_cost_to_own(name=None, de_discount=True):
     df = _filtered_cars()
     if name:
-        df = df[df[Column.NAME].apply(lambda x: _is_model_name(x, name))]
+        df = _filter_by_models(df, [name])
 
     df[Column.TOTAL_PRICE] = df[Column.ADAC_PAKET] + df[Column.PRICE]
 
     if de_discount:
-        df = __apply_de_discount(df, Column.TOTAL_PRICE)
+        df = _apply_de_discount(df, Column.TOTAL_PRICE)
 
     # Range
-    df[Column.RANGE] = df[Column.FUEL_TANK_SIZE] / df[Column.CONSUPTION_CITY_NEFZ] * 100
+    def __calc_range(row):
+        motor_type = row["Motorart"]
+        row[Column.RANGE] = (
+            row[Column.FUEL_TANK_SIZE] / row[Column.CONSUPTION_COMBINED_WLTP] * 100
+        )
 
-    # Column.COSTS_OPERATING is not double due to my insurance premium
+        # plugin Hybrid consumption is too small on long range
+        if motor_type == "PlugIn-Hybrid":
+            row[Column.RANGE] /= 4
+
+        return row
+
+    df = df.apply(__calc_range, axis=1)
+
+    # operating and workshop should be add due to 30k km per year
     df[Column.MY_M_COSTS] = (
-        df[Column.COSTS_FIX] * 2
-        + df[Column.COSTS_OPERATING]
+        df[Column.COSTS_FIX]
+        + df[Column.COSTS_OPERATING] * 2
         + df[Column.COSTS_WORKSHOP] * 2
     )
 
@@ -229,6 +257,7 @@ def _filtered_cars():
     for col in NOT_NA_COLUMNS:
         df = _filter_column(df, col)
 
+    # TODO: remove filtering?
     # Filter seats
     df = df[df[Column.SEATS] > 3]
 
@@ -275,7 +304,7 @@ def _get_sorted_uniq_values(df, ordered_values, reverse=False):
     )
 
 
-def __apply_de_discount(df, column):
+def _apply_de_discount(df, column):
     def get_discount(price, motor_type):
         netto_price = price * 0.81
         if motor_type == "Elektro":
@@ -293,16 +322,14 @@ def __apply_de_discount(df, column):
     def apply_discount(row):
         motor_type = row["Motorart"]
         price = row[Column.PRICE]
-        row[Column.TOTAL_PRICE] = row[Column.TOTAL_PRICE] - get_discount(
-            price, motor_type
-        )
+        row[column] = row[column] - get_discount(price, motor_type)
         return row
 
     df = df.apply(apply_discount, axis=1)
     return df
 
 
-def get_scored_df(only_mentioned_cars=True, de_discount=False):
+def get_scored_df(only_mentioned_cars=True, de_discount=False, keep_columns=None):
     spec_df = pd.read_excel(
         os.path.join(os.path.dirname(__file__), "cars.xlsx"), sheet_name="Spec"
     )
@@ -333,6 +360,11 @@ def get_scored_df(only_mentioned_cars=True, de_discount=False):
     weighted_df[Column.PERFORMANCE_KW] = df[Column.PERFORMANCE_KW]
     weighted_df[Column.TOTAL_PRICE] = df[Column.TOTAL_PRICE]
     weighted_df[Column.MY_M_COSTS] = df[Column.MY_M_COSTS]
+    weighted_df[Column.RANGE] = df[Column.RANGE]
+    if keep_columns:
+        for col in keep_columns:
+            weighted_df[col] = df[col]
+
     for i, row in spec_df.iterrows():
         feature = row[ColumnSpec.FEATURE]
         adac_col = row[ColumnSpec.ADAC_COLUMN]

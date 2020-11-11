@@ -78,6 +78,18 @@ def test_get_adac_data_corsa():
         assert data[key] == expected
 
 
+def test_get_adac_data_tesla():
+    url = "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/tesla/model-3/1generation/308033/"
+    data = _get_adac_data(url)
+    for key, expected in (
+        ("id", "308033"),
+        ("Bremsassistent", "Serie"),
+        ("checksum", "484b016923cfa957dcbc66f76e99b304"),
+    ):
+        assert key in data
+        assert data[key] == expected
+
+
 def test_find_models():
     initial_models = _get_model_urls(15000)
     assert 25 < len(initial_models) < 30

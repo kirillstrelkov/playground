@@ -428,4 +428,4 @@ def find_auto(price, override_model_urls=False, parallel=False):
 
 
 if __name__ == "__main__":
-    find_auto(50000, override_model_urls=False, parallel=False)
+    find_auto(50000, override_model_urls=False, parallel=True)

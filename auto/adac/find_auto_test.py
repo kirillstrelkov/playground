@@ -1,12 +1,15 @@
 from unittest.case import TestCase
 
 from auto.adac.find_auto import (
-    get_models_urls,
-    get_adac_data,
     _get_adac_data,
     _get_model_urls,
     _get_trim_level_urls,
+    find_auto,
+    get_adac_data,
+    get_models_urls,
 )
+from tempfile import TemporaryDirectory
+import os
 
 
 def __filter_model_urls(urls, url_part):
@@ -39,8 +42,8 @@ def test_get_adac_data():
         ("Haltedauer", "5 Jahre"),
         ("Fixkosten", "86 €"),
         ("Typklassen (KH/VK/TK)", "15/16/17"),
-        ("Leistung maximal in kW", "59"),
-        ("checksum", "3c5a5e164bf05a7a6655781527a068f5"),
+        ("Leistung maximal in kW (Systemleistung)", "59"),
+        ("checksum", "c9de13c277287d75f42a2063c0c5dcd7"),
     ):
         assert key in data
         assert data[key] == expected
@@ -58,8 +61,8 @@ def test_get_adac_data2():
         ("Haltedauer", "5 Jahre"),
         ("Fixkosten", "137 €"),
         ("Typklassen (KH/VK/TK)", "20/24/23"),
-        ("Leistung maximal in kW", "147"),
-        ("checksum", "89fbadfca6d16f39f4adc338b93a0183"),
+        ("Leistung maximal in kW (Systemleistung)", "147"),
+        ("checksum", "df456fd01bd9ca1e31a8753f3a4943cd"),
     ):
         assert key in data
         assert data[key] == expected
@@ -71,8 +74,8 @@ def test_get_adac_data_corsa():
     for key, expected in (
         ("id", "312301"),
         ("Fixkosten", "88 €"),
-        ("Betriebskosten", "96 €"),
-        ("checksum", "fe65319b796e4b5286158d00082094aa"),
+        ("Betriebskosten", "95 €"),
+        ("checksum", "8b9998295d8f258149b8d7310f4b53ee"),
     ):
         assert key in data
         assert data[key] == expected
@@ -84,7 +87,7 @@ def test_get_adac_data_tesla():
     for key, expected in (
         ("id", "308033"),
         ("Bremsassistent", "Serie"),
-        ("checksum", "484b016923cfa957dcbc66f76e99b304"),
+        ("checksum", "abc34625386d812f20dd9cc35e173a37"),
     ):
         assert key in data
         assert data[key] == expected
@@ -97,7 +100,27 @@ def test_find_models():
 
 
 def test_get_trim_level_urls():
-    price = 8000
+    price = 10000
     model_urls = _get_model_urls(price)
     trim_level_urls = _get_trim_level_urls(price)
     assert len(model_urls) < len(trim_level_urls)
+
+
+def test_find_cars_parallel():
+    with TemporaryDirectory() as tmp_dir:
+        json_path = os.path.join(tmp_dir, "adac.json")
+        csv_path = os.path.join(tmp_dir, "adac.csv")
+        cars = find_auto(10000, csv_path, json_path, parallel=True)
+        rows, cols = cars.shape
+
+        assert rows >= 4
+
+
+def test_find_cars_iteratevly():
+    with TemporaryDirectory() as tmp_dir:
+        json_path = os.path.join(tmp_dir, "adac.json")
+        csv_path = os.path.join(tmp_dir, "adac.csv")
+        cars = find_auto(10000, csv_path, json_path, parallel=False)
+        rows, cols = cars.shape
+
+        assert rows >= 4

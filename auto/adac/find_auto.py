@@ -12,19 +12,18 @@ from itertools import chain
 from multiprocessing import cpu_count
 from pstats import SortKey
 
+import numpy as np
 import pandas as pd
+from common_utils import browser_decorator, get_browser
 from easelenium.browser import Browser
 from loguru import logger
 from pandas import DataFrame
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from tqdm import tqdm
-
-from common_utils import browser_decorator, get_browser
 from utils.csv import save_dicts
 from utils.lists import flatten
 from utils.misc import concurrent_map, tqdm_concurrent_map
-import numpy as np
 
 TIMEOUT_WAIT_FOR = 15
 
@@ -299,7 +298,7 @@ def __get_data_for_trim_processing(url, df_old_data=None):
         checksums = []
         processed_ids = set()
         processed_checksums = set()
-        processed_date = None
+        processed_date = datetime.now()
 
     return {
         "url": url,
@@ -340,19 +339,21 @@ def __save_iteratively(urls, path):
 
         __save_models_and_trims(pd.DataFrame([adac_data]), path)
 
+    return pd.read_csv(path)
+
 
 def __process_trim_url(data):
     url = data["url"]
     processed_checksums = data["checksums"]
-    processed_date = data["processed date"]
-    is_too_old = (
-        (np.datetime64(datetime.now()) - processed_date).dt.days > DAYS_TO_EXPIRE
-    ).all()
 
     model_id = __get_id(url)
 
     is_processed_id = model_id in data["ids"]
     if is_processed_id:
+        processed_date = data["processed date"]
+        is_too_old = (
+            (np.datetime64(datetime.now()) - processed_date).days > DAYS_TO_EXPIRE
+        ).all()
         if is_too_old:
             logger.warning(f"{model_id} updated long time ago")
         else:
@@ -387,17 +388,16 @@ def __save_parallel(urls, path):
         __process_trim_url,
         [__get_data_for_trim_processing(url, df_old_data) for url in urls],
     )
-    data = [d for d in data if d]
+    df = pd.DataFrame([d for d in data if d])
 
-    __save_models_and_trims(pd.DataFrame(data), path)
+    __save_models_and_trims(df, path)
+
+    return df
 
 
-def find_auto(price, override_model_urls=False, parallel=False):
-    path = os.path.join(os.path.dirname(__file__), "adac.csv")
-    urls_path = os.path.join(os.path.dirname(__file__), "adac_urls.json")
-
-    if os.path.exists(urls_path) and not override_model_urls:
-        with open(urls_path, mode="r") as f:
+def find_auto(price, output_path, json_path, override_model_urls=False, parallel=False):
+    if os.path.exists(json_path) and not override_model_urls:
+        with open(json_path, mode="r") as f:
             urls = json.load(f)
     else:
         price_step = min_price = 5000
@@ -411,7 +411,7 @@ def find_auto(price, override_model_urls=False, parallel=False):
                 ],
             )
         )
-        with open(urls_path, mode="w") as f:
+        with open(json_path, mode="w") as f:
             # Add my Subaru
             # TODO: fix Wertverlust, ADAC - Klassenübliche Ausstattung
             urls.append(
@@ -422,10 +422,15 @@ def find_auto(price, override_model_urls=False, parallel=False):
     logger.info("Total models with different trim levels: {}".format(len(urls)))
 
     if parallel:
-        __save_parallel(urls, path)
+        df = __save_parallel(urls, output_path)
     else:
-        __save_iteratively(urls, path)
+        df = __save_iteratively(urls, output_path)
+
+    return df
 
 
 if __name__ == "__main__":
-    find_auto(50000, override_model_urls=False, parallel=True)
+    adac_path = os.path.join(os.path.dirname(__file__), "adac.csv")
+    urls_path = os.path.join(os.path.dirname(__file__), "adac_urls.json")
+
+    find_auto(50000, adac_path, urls_path, override_model_urls=True, parallel=True)

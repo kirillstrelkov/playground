@@ -1,9 +1,12 @@
+wheel
+more_itertools
 gspread
 oauth2client
 selenium
 tenacity
 pytest
 pytest-html
+pytest-env
 black
 easelenium
 flake8

@@ -1,15 +1,13 @@
-from unittest.case import TestCase
+import os
+from tempfile import TemporaryDirectory
 
 from auto.adac.find_auto import (
     _get_adac_data,
     _get_model_urls,
     _get_trim_level_urls,
     find_auto,
-    get_adac_data,
     get_models_urls,
 )
-from tempfile import TemporaryDirectory
-import os
 
 
 def __filter_model_urls(urls, url_part):

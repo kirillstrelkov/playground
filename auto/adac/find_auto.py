@@ -1,27 +1,17 @@
 # coding=utf-8
-import cProfile
-import io
 import json
 import os
-import pstats
 import re
-import traceback
 from datetime import datetime
 from hashlib import md5
 from itertools import chain
-from multiprocessing import cpu_count
-from pstats import SortKey
 
 import numpy as np
 import pandas as pd
-from common_utils import browser_decorator, get_browser
-from easelenium.browser import Browser
+from common_utils import browser_decorator
 from loguru import logger
-from pandas import DataFrame
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from tqdm import tqdm
-from utils.csv import save_dicts
 from utils.lists import flatten
 from utils.misc import concurrent_map, tqdm_concurrent_map
 

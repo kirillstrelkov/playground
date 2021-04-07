@@ -24,3 +24,4 @@ jupyter-kite
 yfinance
 loguru
 tabulate
+pycln

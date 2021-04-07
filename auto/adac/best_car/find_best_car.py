@@ -1,8 +1,9 @@
-import pandas as pd
 import os
+import re
+
+import pandas as pd
 from numpy import nan
 from pandas.core.frame import DataFrame
-import re
 
 NOT_NA_COLUMNS = [
     "Autom. Abstandsregelung",
@@ -21,11 +22,13 @@ class Column(object):
     COSTS_WORKSHOP = "Werkstattkosten"
     MARK = "Marke"
     SERIE = "Baureihe"
-    PERFORMANCE_KW = "Leistung maximal in kW"
+    PERFORMANCE_KW = "Leistung maximal in kW (Systemleistung)"
+    ENGINE_TYPE = "Motorart"
     PRICE = "Grundpreis"
     ADAC_PAKET = "Klassenübliche Ausstattung nach ADAC-Vorgabe"
     ACCELERATION = "Beschleunigung 0-100km/h"
     FUEL_TANK_SIZE = "Tankgröße"
+    BATTERY_CAPACITY = "Batteriekapazität (Netto) in kWh"
     CONSUPTION_TOTAL_NEFZ = "Verbrauch Gesamt (NEFZ)"
     CONSUPTION_COMBINED_WLTP = "Verbrauch nach WLTP kombiniert"
     # New columns:
@@ -75,6 +78,7 @@ Vollkaskobetrag 100% 500 Euro SB
     Column.PRICE,
     Column.ACCELERATION,
     Column.FUEL_TANK_SIZE,
+    Column.BATTERY_CAPACITY,
     Column.CONSUPTION_TOTAL_NEFZ,
     Column.CONSUPTION_COMBINED_WLTP,
 ]
@@ -218,13 +222,15 @@ def _get_df_with_cost_to_own(name=None, de_discount=True):
 
     # Range
     def __calc_range(row):
-        motor_type = row["Motorart"]
-        row[Column.RANGE] = (
-            row[Column.FUEL_TANK_SIZE] / row[Column.CONSUPTION_COMBINED_WLTP] * 100
+        tank = (
+            row[Column.BATTERY_CAPACITY]
+            if row[Column.ENGINE_TYPE] == "Elektro"
+            else row[Column.FUEL_TANK_SIZE]
         )
+        row[Column.RANGE] = tank / row[Column.CONSUPTION_COMBINED_WLTP] * 100
 
         # plugin Hybrid consumption is too small on long range
-        if motor_type == "PlugIn-Hybrid":
+        if row["Motorart"] == "PlugIn-Hybrid":
             row[Column.RANGE] /= 4
 
         return row

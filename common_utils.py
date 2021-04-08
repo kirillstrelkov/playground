@@ -1,8 +1,9 @@
-from selenium import webdriver
-from easelenium.browser import Browser
-from selenium.common.exceptions import WebDriverException
-from functools import wraps
 import traceback
+from functools import wraps
+
+from easelenium.browser import Browser
+from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 
 
 def get_browser(name="gc", headless=True):
@@ -32,7 +33,7 @@ def browser_decorator(func):
             kwargs["browser"] = browser
             value = func(*args, **kwargs)
             return_value = value
-        except WebDriverException:
+        except:
             try:
                 if browser:
                     browser.save_screenshot()

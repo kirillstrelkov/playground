@@ -1,11 +1,11 @@
-from common_utils import get_browser
-from auto.adac.best_car.find_best_car import _is_model_name
 import re
 import traceback
+
+from auto.adac.best_car.find_best_car import _is_model_name
+from common_utils import browser_decorator
+from numpy import mean
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
-from numpy import mean
-
 
 CSS_SEARCH_INPUT = (By.CSS_SELECTOR, "input.search__input")
 CSS_SEARCH_BTN = (By.CSS_SELECTOR, "button.js-search-submit")
@@ -42,64 +42,67 @@ def _find_possibile_blocks(browser, query):
     return sorted(blocks, key=lambda x: (-len(x["title"]), x["year"]), reverse=True)
 
 
-def find_score(query):
+@browser_decorator
+def find_score(query, browser=None):
     data = {
         "query": query,
         "name": "",
         "scores": [],
         "average": 0,
     }
-    try:
-        browser = get_browser()
-        browser.get("https://www.testberichte.de/")
-        browser.type(CSS_SEARCH_INPUT, query)
-        browser.click(CSS_SEARCH_BTN)
 
-        for block in _find_possibile_blocks(browser, query):
-            browser.get(block["url"])
+    browser.get("https://www.testberichte.de/")
 
-            browser.wait_for_visible(CSS_TITLE)
-            if browser.is_visible(CSS_MORE_REVIEWS):
-                browser.click(CSS_MORE_REVIEWS)
+    css_cookie_frame = (By.CSS_SELECTOR, "[title='SP Consent Message']")
+    css_accept_cookies = (
+        By.XPATH,
+        "(//button[contains(text(), 'Zustimmen')])[2]",
+    )
 
-            raitings = [
-                browser.get_text(e) for e in browser.find_elements(CSS_REVIEW_TITLE)
-            ]
-            raitings = [r for r in raitings if "Punkten" in r and "," not in r]
+    browser.wait_for_visible(css_cookie_frame)
+    browser.switch_to_frame(css_cookie_frame)
+    browser.click(css_accept_cookies)
+    browser.switch_to_default_content()
 
-            if len(raitings) == 0:
-                continue
+    browser.type(CSS_SEARCH_INPUT, query + "\n")
 
-            data["name"] = browser.get_text(CSS_PAGE_TITLE)
-            for raiting in raitings:
-                numbers = re.findall(r"\d+", raiting[: raiting.index("Punkten")])
-                assert len(numbers) == 2
-                data["scores"].append(
-                    {"score": int(numbers[0]), "total": int(numbers[1])}
-                )
+    for block in _find_possibile_blocks(browser, query):
+        browser.get(block["url"])
 
-            if data["scores"]:
-                data["average"] = mean(
-                    [d["score"] / float(d["total"]) for d in data["scores"]]
-                )
+        browser.wait_for_visible(CSS_TITLE)
+        if browser.is_visible(CSS_MORE_REVIEWS):
+            browser.click(CSS_MORE_REVIEWS)
 
-            return data
+        raitings = [
+            browser.get_text(e) for e in browser.find_elements(CSS_REVIEW_TITLE)
+        ]
+        raitings = [r for r in raitings if "Punkten" in r and "," not in r]
 
-    except WebDriverException:
-        if browser:
-            browser.save_screenshot()
-        traceback.print_exc()
-    finally:
-        if browser:
-            browser.quit()
+        if len(raitings) == 0:
+            continue
+
+        data["name"] = browser.get_text(CSS_PAGE_TITLE)
+        for raiting in raitings:
+            numbers = re.findall(r"\d+", raiting[: raiting.index("Punkten")])
+            assert len(numbers) == 2
+            data["scores"].append({"score": int(numbers[0]), "total": int(numbers[1])})
+
+        if data["scores"]:
+            data["average"] = mean(
+                [d["score"] / float(d["total"]) for d in data["scores"]]
+            )
+
+        return data
 
     return data
 
 
 if __name__ == "__main__":
-    cars = "Peugeot 208,opel corsa,hyundai ioniq hybrid plugin,kia xceed,kia ceed,ford focus,vw golf,seat leon,skoda octavia,toyota corolla,opel grandland x,subaru impreza,renault captur,renault clio,Peugeot 2008,ford puma,ford fiesta,Peugeot 3008,skoda karoq,skoda kodiaq,kia sportage,vw t roc,vw tiguan,subaru outback,hyundai tucson,seat ateca,vw t-cross,Mercedes A,Mercedes B,audi a1,audi a3,Bmw 1,honda civic,Toyota rav4,Peugeot 508,Opel insignia".split(
-        ","
-    )
-    data = [find_score(car + " 2020") for car in cars]
-    for d in data:
-        print(f"{d['query']},{d['name']},{d['average']}")
+    # cars = "Peugeot 208,opel corsa,hyundai ioniq hybrid plugin,kia xceed,kia ceed,ford focus,vw golf,seat leon,skoda octavia,toyota corolla,opel grandland x,subaru impreza,renault captur,renault clio,Peugeot 2008,ford puma,ford fiesta,Peugeot 3008,skoda karoq,skoda kodiaq,kia sportage,vw t roc,vw tiguan,subaru outback,hyundai tucson,seat ateca,vw t-cross,Mercedes A,Mercedes B,audi a1,audi a3,Bmw 1,honda civic,Toyota rav4,Peugeot 508,Opel insignia, tesla model 3, ford kuga".split(
+    cars = "seat leon,vw golf".split(",")
+    for car in cars:
+        d = find_score(car + " 2021")
+        if d:
+            print(f"{d['query']},{d['name']},{d['average']}")
+        else:
+            print("Not data for {car}")

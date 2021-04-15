@@ -31,6 +31,7 @@ class Column(object):
     BATTERY_CAPACITY = "Batteriekapazität (Netto) in kWh"
     CONSUPTION_TOTAL_NEFZ = "Verbrauch Gesamt (NEFZ)"
     CONSUPTION_COMBINED_WLTP = "Verbrauch nach WLTP kombiniert"
+    BODY_TYPE = "Karosserie"
     # New columns:
     NAME = "name"
     MY_M_COSTS = "my monthly costs"
@@ -53,8 +54,7 @@ class ColumnSpec(object):
 class Constant(object):
     TRANSMISSION_MANUAL = "Schaltgetriebe"
 
-
-COLS_WITH_NUMERIC_DATA = """
+    COLS_WITH_NUMERIC_DATA = """
 Höchstgeschwindigkeit
 Beschleunigung 0-100km/h
 Fahrgeräusch
@@ -71,17 +71,17 @@ KFZ-Steuer pro Jahr
 Haftpflichtbeitrag 100%
 Vollkaskobetrag 100% 500 Euro SB
 """.strip().splitlines() + [
-    Column.COSTS_FIX,
-    Column.COSTS_OPERATING,
-    Column.COSTS_WORKSHOP,
-    Column.ADAC_PAKET,
-    Column.PRICE,
-    Column.ACCELERATION,
-    Column.FUEL_TANK_SIZE,
-    Column.BATTERY_CAPACITY,
-    Column.CONSUPTION_TOTAL_NEFZ,
-    Column.CONSUPTION_COMBINED_WLTP,
-]
+        Column.COSTS_FIX,
+        Column.COSTS_OPERATING,
+        Column.COSTS_WORKSHOP,
+        Column.ADAC_PAKET,
+        Column.PRICE,
+        Column.ACCELERATION,
+        Column.FUEL_TANK_SIZE,
+        Column.BATTERY_CAPACITY,
+        Column.CONSUPTION_TOTAL_NEFZ,
+        Column.CONSUPTION_COMBINED_WLTP,
+    ]
 
 
 def _get_columns_with_euro(df=None):
@@ -171,7 +171,7 @@ def _fix_numeric_columns(df):
     # Trailer-Assist
 
     #  fix to numeric
-    for col in COLS_WITH_NUMERIC_DATA:
+    for col in Constant.COLS_WITH_NUMERIC_DATA:
         df[col] = df[col].apply(__convert_to_float)
     return df
 
@@ -189,10 +189,13 @@ def _fix_missing_values_by_adding_avg(df):
     def get_avg(col, groupby, value):
         return df[df[groupby] == value].groupby(groupby).mean().get(col, [pd.NA])[0]
 
-    # fix by average mark, modell if that doesn't work fix by average mark
+        # fix by average mark, modell if that doesn't work fix by average mark
 
     for groupby_col in [Column.SERIE, Column.MARK]:
-        for col in COLS_WITH_NUMERIC_DATA:
+        for col in Constant.COLS_WITH_NUMERIC_DATA:
+            if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
+                continue
+
             df_bad = df[pd.isna(df[col])]
             for value in df_bad[groupby_col].unique():
                 df.loc[
@@ -210,14 +213,18 @@ def _filter_by_models(df, names):
     ]
 
 
-def _get_df_with_cost_to_own(name=None, de_discount=True):
-    df = _filtered_cars()
+def _get_df_with_cost_to_own(name=None, de_discount=True, filtered_cars=None):
+    if filtered_cars is None:
+        df = _filtered_cars()
+    else:
+        df = filtered_cars
+
     if name:
         df = _filter_by_models(df, [name])
 
     df[Column.TOTAL_PRICE] = df[Column.ADAC_PAKET] + df[Column.PRICE]
 
-    if de_discount:
+    if not df.empty and de_discount:
         df = _apply_de_discount(df, Column.TOTAL_PRICE)
 
     # Range
@@ -235,7 +242,8 @@ def _get_df_with_cost_to_own(name=None, de_discount=True):
 
         return row
 
-    df = df.apply(__calc_range, axis=1)
+    if not df.empty:
+        df = df.apply(__calc_range, axis=1)
 
     # operating and workshop should be add due to 30k km per year
     df[Column.MY_M_COSTS] = (
@@ -252,13 +260,12 @@ def get_cars():
     return pd.read_csv(path)
 
 
-def _filtered_cars():
-    df = get_cars()
+def _filtered_cars(df=None):
+    if df is None:
+        df = get_cars()
 
     df = _fix_numeric_columns(df)
     df = __fix_bad_data(df)
-
-    df = _fix_missing_values_by_adding_avg(df)
 
     for col in NOT_NA_COLUMNS:
         df = _filter_column(df, col)
@@ -267,8 +274,12 @@ def _filtered_cars():
     # Filter seats
     df = df[df[Column.SEATS] > 3]
 
+    df = df[df[Column.BODY_TYPE] != "Kombi"]
+
     # Filter transmission
     df = df[df[Column.TRANSMISSION] != Constant.TRANSMISSION_MANUAL]
+
+    df = _fix_missing_values_by_adding_avg(df)
 
     return df
 
@@ -335,7 +346,9 @@ def _apply_de_discount(df, column):
     return df
 
 
-def get_scored_df(only_mentioned_cars=True, de_discount=False, keep_columns=None):
+def get_scored_df(
+    only_mentioned_cars=True, de_discount=False, keep_columns=None, filtered_cars=None
+):
     spec_df = pd.read_excel(
         os.path.join(os.path.dirname(__file__), "cars.xlsx"), sheet_name="Spec"
     )
@@ -353,10 +366,17 @@ def get_scored_df(only_mentioned_cars=True, de_discount=False, keep_columns=None
         df = DataFrame()
         for model in set(spec_df.columns).difference(spec_add_data_col):
             df = pd.concat(
-                [df, _get_df_with_cost_to_own(model, de_discount=de_discount)]
+                [
+                    df,
+                    _get_df_with_cost_to_own(
+                        model, de_discount=de_discount, filtered_cars=filtered_cars
+                    ),
+                ]
             )
     else:
-        df = _get_df_with_cost_to_own(de_discount=de_discount)
+        df = _get_df_with_cost_to_own(
+            de_discount=de_discount, filtered_cars=filtered_cars
+        )
 
     columns_with_weights = spec_df[ColumnSpec.FEATURE]
     weighted_df = DataFrame()

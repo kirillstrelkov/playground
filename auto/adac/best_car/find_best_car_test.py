@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from auto.adac.best_car.find_best_car import (
-    COLS_WITH_NUMERIC_DATA,
     NOT_NA_COLUMNS,
     Column,
     Constant,
@@ -21,58 +20,91 @@ from auto.adac.best_car.find_best_car import (
 from numpy import nan
 
 
-def test_join_adac_and_score():
-    df = get_cars()
-    df_score = get_scored_df(
-        only_mentioned_cars=False, de_discount=True, keep_columns=["id"]
+@pytest.fixture
+def df_cars():
+    return get_cars()
+
+
+@pytest.fixture
+def df_filtered_cars(df_cars):
+    return _filtered_cars(df=df_cars)
+
+
+@pytest.fixture
+def df_scored_de_discount(df_filtered_cars):
+    return get_scored_df(
+        only_mentioned_cars=False,
+        de_discount=True,
+        keep_columns=["id"],
+        filtered_cars=df_filtered_cars,
     )
-    df_joined = pd.merge(df, df_score.drop("name", axis=1), on="id", how="left")
+
+
+@pytest.fixture
+def df_scored(df_filtered_cars):
+    return get_scored_df(only_mentioned_cars=False, filtered_cars=df_filtered_cars)
+
+
+@pytest.fixture
+def df_scored_mentioned_only(df_filtered_cars):
+    return get_scored_df(only_mentioned_cars=True, filtered_cars=df_filtered_cars)
+
+
+def test_join_adac_and_score(df_cars, df_scored_de_discount):
+    df_joined = pd.merge(
+        df_cars, df_scored_de_discount.drop("name", axis=1), on="id", how="left"
+    )
     assert df_joined[df_joined["name"].str.contains("Impreza")].shape[0] >= 5
 
 
-def test_model3_score_better_than_impreza():
-    df_score = get_scored_df(only_mentioned_cars=False, de_discount=True)
-    model = df_score[df_score["name"].str.contains("Tesla")].iloc[0]
+def test_model3_score_better_than_impreza(df_scored_de_discount):
+    model = df_scored_de_discount[
+        df_scored_de_discount["name"].str.contains("Tesla")
+    ].iloc[0]
     assert model[Column.TOTAL_SCORE] > 186
     assert model[Column.RANGE] >= 50 / 15 * 100
     assert model[Column.EURO_PER_SCORE] < 190
 
 
-def test_leon_proper_score():
-    df_score = get_scored_df(only_mentioned_cars=False, de_discount=True)
-    model = df_score[df_score["name"].str.contains("SEAT Leon 1.4 e-HYBRID")].iloc[0]
+def test_no_combi(df_filtered_cars):
+    for car in ["Octavia (IV) Combi", "VW Golf Variant"]:
+        rows, cols = df_filtered_cars[df_filtered_cars["name"].str.contains(car)].shape
+        assert rows == 0
+
+
+def test_leon_proper_score(df_scored_de_discount):
+    model = df_scored_de_discount[
+        df_scored_de_discount["name"].str.contains("SEAT Leon 1.4 e-HYBRID")
+    ].iloc[0]
     assert model[Column.RANGE] < 1000
 
 
-def test_fix_missing_values_by_adding_avg():
-    df = get_cars()
+def test_fix_missing_values_by_adding_avg(df_cars):
+    df = df_cars
     df = _fix_numeric_columns(df)
 
     df = _fix_missing_values_by_adding_avg(df)
 
-    # TODO: fix check for battery capacity
-    numeric_columns = COLS_WITH_NUMERIC_DATA
-    numeric_columns.remove(Column.BATTERY_CAPACITY)
-    for col in numeric_columns:
+    for col in Constant.COLS_WITH_NUMERIC_DATA:
+        if col == Column.BATTERY_CAPACITY:
+            continue
+
         assert df[pd.isna(df[col])].shape[0] < 400, f"Bad data for {col}"
 
 
-def test_filtered_cars():
-    df = _filtered_cars()
+def test_filtered_cars(df_filtered_cars):
     for column in NOT_NA_COLUMNS:
-        assert np.nan not in set(df[column].tolist())
+        assert np.nan not in set(df_filtered_cars[column].tolist())
 
 
-def test_filtered_cars_proper_seats():
-    df = _filtered_cars()
-    seats_val = set(df[Column.SEATS].tolist())
+def test_filtered_cars_proper_seats(df_filtered_cars):
+    seats_val = set(df_filtered_cars[Column.SEATS].tolist())
     assert 2 not in seats_val
     assert 3 not in seats_val
 
 
-def test_filtered_cars_proper_transmission():
-    df = _filtered_cars()
-    seats_val = set(df[Column.TRANSMISSION].tolist())
+def test_filtered_cars_proper_transmission(df_filtered_cars):
+    seats_val = set(df_filtered_cars[Column.TRANSMISSION].tolist())
     assert Constant.TRANSMISSION_MANUAL not in seats_val
 
 
@@ -83,9 +115,9 @@ def test_get_columns_with_euro():
     assert "Leergewicht (EU)" not in cols
 
 
-def test_calc_cost_to_own():
+def test_calc_cost_to_own(df_filtered_cars):
     auto = "subaru impreza"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
     for index, car in df.iterrows():
         assert car[Column.MY_M_COSTS] > 500
@@ -98,28 +130,34 @@ def test_calc_cost_to_own():
     assert not df[df[Column.NAME].str.contains("Subaru Impreza 2.0i Exclusive")].empty
 
 
-def test_calc_cost_to_own_208():
+def test_calc_cost_to_own_208(df_filtered_cars):
     auto = "Peugeot 208"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
     for index, car in df.iterrows():
-        assert car[Column.MY_M_COSTS] > 300
-        assert car[Column.MY_M_COSTS] < 500
+        assert 300 < car[Column.MY_M_COSTS] < 500
+        capacity = car[Column.BATTERY_CAPACITY]
+        tank = car[Column.FUEL_TANK_SIZE]
+        if car[Column.ENGINE_TYPE] == "Elektro":
+            assert pd.notna(capacity)
+            assert pd.isna(tank)
+        else:
+            assert pd.notna(tank)
+            assert pd.isna(capacity)
 
 
-def test_calc_cost_to_own_corsa():
+def test_calc_cost_to_own_corsa(df_filtered_cars):
     auto = "opel corsa"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
     for index, car in df.iterrows():
-        assert car[Column.MY_M_COSTS] > 300
-        assert car[Column.MY_M_COSTS] < 500
+        assert 300 < car[Column.MY_M_COSTS] < 500
         assert car[Column.ACCELERATION] < 11
 
 
-def test_calc_cost_to_own_ceed():
+def test_calc_cost_to_own_ceed(df_filtered_cars):
     auto = "kia ceed"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
     for index, car in df.iterrows():
         assert car[Column.MY_M_COSTS] > 300
@@ -127,36 +165,36 @@ def test_calc_cost_to_own_ceed():
         assert car[Column.ACCELERATION] < 12
 
 
-def test_calc_cost_to_own_ioniq():
+def test_calc_cost_to_own_ioniq(df_filtered_cars):
     auto = "hyundai ioniq hybrid plugin"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
     for index, car in df.iterrows():
         assert car[Column.MY_M_COSTS] > 400
         assert car[Column.MY_M_COSTS] < 600
 
 
-def test_calc_cost_to_own_mb_a():
+def test_calc_cost_to_own_mb_a(df_filtered_cars):
     auto = "Mercedes A"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert not df[df[Column.NAME].str.contains("Mercedes A")].empty
 
 
-def test_calc_cost_to_own_bmw_1():
+def test_calc_cost_to_own_bmw_1(df_filtered_cars):
     auto = "Bmw 1"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
 
 
-def test_calc_cost_to_own_3008():
+def test_calc_cost_to_own_3008(df_filtered_cars):
     auto = "peugeot 3008"
-    df = _get_df_with_cost_to_own(auto)
+    df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) >= 2
 
 
 @pytest.mark.skip("TODO")
-def test_euro_columns():
-    df = _get_df_with_cost_to_own()
+def test_euro_columns(df_filtered_cars):
+    df = _get_df_with_cost_to_own(filtered_cars=df_filtered_cars)
     for col in df.columns:
         for i, row in df.iterrows():
             val = row[col]
@@ -189,8 +227,8 @@ def test_get_sorted_uniq_values():
     ]
 
 
-def test_missing_cars():
-    scored = get_scored_df()
+def test_missing_cars(df_scored_mentioned_only):
+    scored = df_scored_mentioned_only
     df_input = pd.read_excel(os.path.join(os.path.dirname(__file__), "cars.xlsx"))
     index = df_input.columns.tolist().index("weight")
 
@@ -207,29 +245,19 @@ def test_missing_cars():
     assert len(bad_cars) == 0
 
 
-def test_score():
-    scored = get_scored_df()
+def test_score(df_scored):
+    scored = df_scored
     for i, row in scored.iterrows():
         assert row[Column.TOTAL_SCORE] > 0
         assert row[Column.TOTAL_SCORE] < 400
         assert pd.isna(row["Acceleration <10"]) or row["Acceleration <10"] >= 0
         assert row["adaptive lights"] >= 0
-        assert row["LED matrix"] >= 0
+        assert "LED matrix" in row.index.tolist()
         assert "mobile support" not in row.index.tolist()
 
 
-def test_score_all_cars():
-    scored = get_scored_df(False)
-    for i, row in scored.iterrows():
-        assert row[Column.TOTAL_SCORE] > 0
-        assert row[Column.TOTAL_SCORE] < 400
-        assert pd.isna(row["Acceleration <10"]) or row["Acceleration <10"] >= 0
-        assert row["adaptive lights"] >= 0
-        assert "mobile support" not in row.index.tolist()
-
-
-def test_score_all_cars_de():
-    scored = get_scored_df(de_discount=True)
+def test_score_all_cars(df_scored):
+    scored = df_scored
     for i, row in scored.iterrows():
         assert row[Column.TOTAL_SCORE] > 0
         assert row[Column.TOTAL_SCORE] < 400
@@ -238,9 +266,20 @@ def test_score_all_cars_de():
         assert "mobile support" not in row.index.tolist()
 
 
-def test_calc_cost_to_own_ioniq_with_german_discount():
+def test_score_all_cars_de(df_scored_de_discount):
+    for i, row in df_scored_de_discount.iterrows():
+        assert row[Column.TOTAL_SCORE] > 0
+        assert row[Column.TOTAL_SCORE] < 400
+        assert pd.isna(row["Acceleration <10"]) or row["Acceleration <10"] >= 0
+        assert row["adaptive lights"] >= 0
+        assert "mobile support" not in row.index.tolist()
+
+
+def test_calc_cost_to_own_ioniq_with_german_discount(df_filtered_cars):
     auto = "hyundai ioniq"
-    df = _get_df_with_cost_to_own(auto, de_discount=True)
+    df = _get_df_with_cost_to_own(
+        auto, de_discount=True, filtered_cars=df_filtered_cars
+    )
     assert len(df) > 1
     for index, car in df.iterrows():
         is_electric = car["Motorart"] in ["PlugIn-Hybrid", "Elektro"]
@@ -253,9 +292,11 @@ def test_calc_cost_to_own_ioniq_with_german_discount():
             )
 
 
-def test_calc_cost_to_own_corsa_e_with_german_discount():
+def test_calc_cost_to_own_corsa_e_with_german_discount(df_filtered_cars):
     auto = "opel corsa-e"
-    df = _get_df_with_cost_to_own(auto, de_discount=True)
+    df = _get_df_with_cost_to_own(
+        auto, de_discount=True, filtered_cars=df_filtered_cars
+    )
     assert len(df) > 1
     for index, car in df.iterrows():
         is_electric = car["Motorart"] == "Elektro"
@@ -279,14 +320,14 @@ def test_missing_features_in_input_excel():
 
 
 @pytest.mark.skip("TODO: find and fix missing data in adac!!")
-def test_missing_features_in_adac():
+def test_missing_features_in_adac(df_filtered_cars):
     df_input = pd.read_excel(os.path.join(os.path.dirname(__file__), "cars.xlsx"))
     cols = set(["name"] + df_input["adac column"].dropna().to_list()) - set(
         "LED-Scheinwerfer,Navigation,Querverkehrassistent,Aktive Kopfstützen,Fußgängererkennung,Kurvenlicht,Notbremsassistent,Spurhalteassistent,Stauassistent,Verkehrsschild-Erkennung".split(
             ","
         )
     )
-    df = _get_df_with_cost_to_own()
+    df = _get_df_with_cost_to_own(filtered_cars=df_filtered_cars)
 
     df_bad = pd.DataFrame()
     for i, row in df[cols].iterrows():
@@ -299,8 +340,8 @@ def test_missing_features_in_adac():
 
 
 @pytest.mark.skip("TODO: find and fix missing data in adac!!")
-def test_get_scored_df_no_na():
-    df = get_scored_df(only_mentioned_cars=False)
+def test_get_scored_df_no_na(df_scored):
+    df = df_scored
     df_bad = df[df.apply(lambda x: pd.isna(x).any(), axis=1)]
     cols = df_bad.columns[1:]
 

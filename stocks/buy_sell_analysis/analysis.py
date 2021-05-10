@@ -12,64 +12,28 @@ START_DATE = "2011-01-01"
 END_DATE = "2019-01-01"
 
 
-def __get_history(symbol, interval):
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(interval=interval, start=START_DATE, end=END_DATE)
-    if not df.empty:
-        df["Symbol"] = symbol
+def __get_history(symbols, interval):
+    df = yf.download(
+        symbols, interval=interval, start=START_DATE, end=END_DATE, group_by="ticker"
+    )
+
     return df
 
 
-def _get_weekly_diffs(df_symbols):
-    symbol = df_symbols["Symbol"]
-    interval = df_symbols["interval"]
-    df = __get_history(symbol, interval)
-
-    first_day = "Monday"
-    last_day = "Friday"
-
-    symbol = df["Symbol"][0]
+def __update_dataframe(df):
     df = df.reset_index()
-    df["weekday"] = df["Date"].apply(lambda x: x.day_name())
 
-    if df[df["weekday"] == first_day].empty:
-        return {}
+    for component in ["year", "month", "day", "hour", "minute"]:
+        df[component] = df["Date"].apply(lambda x: getattr(x, component))
 
-    # getting first row that starts with Monday
-    df = df[df[df["weekday"] == first_day].index[0] :]
-    prev_monday_price = 0
-    full_weeks = []
-    is_monday = False
-    is_friday = False
-    week = []
-    for _, row in df.iterrows():
-        weekday = row["weekday"]
-        # filter weeks were all days were traiding days
-        is_monday = weekday == first_day
-        is_friday = weekday == last_day
+    df["day_name"] = df["Date"].apply(lambda x: x.day_name())
+    df["month_name"] = df["Date"].apply(lambda x: x.month_name())
+    df["weekday"] = df["Date"].apply(lambda x: x.weekday())
+    df["week"] = df["Date"].apply(lambda x: x.isocalendar()[1])
 
-        if is_monday:
-            prev_monday_price = row["Open"]
-            price_diff = 1
-            week = [row]
-        else:
-            if prev_monday_price == 0:
-                continue
-            price_diff = row["Open"] / prev_monday_price
-            week.append(row)
-        row["diff"] = price_diff
+    # Filteting NA in Open - this means usually a dividends
+    df = df[df["Open"].notna()]
 
-        if is_friday and len(week) == 5:
-            full_weeks += week
-
-    logger.debug(f"{symbol} {len(full_weeks)} full weeks")
-
-    if not full_weeks:
-        return {}
-
-    df = DataFrame(full_weeks)
-
-    df["Symbol"] = symbol
     return df
 
 
@@ -83,102 +47,131 @@ def __get_symbols(filename, limit):
     return symbols
 
 
+def _get_best_weekday_diffs(df_symbols):
+    symbol = df_symbols["symbol"]
+    df = __update_dataframe(df_symbols["history"])
+
+    # if number of working days less than 3 - don't count
+    number_of_good_working = 3
+
+    # Filter columns
+    df = df[["year", "week", "weekday", "Open"]]
+
+    df_weeks = DataFrame()
+    for year in df["year"].unique():
+        for week in df["week"].unique():
+            df_week = df[(df["year"] == year) & (df["week"] == week)]
+            if df_week.empty:
+                continue
+
+            days = df_week["weekday"].values
+            if df_week.shape[0] < number_of_good_working:
+                # first and last week of year might contain only 1-2 days
+                if week not in (1, 52, 53):
+                    logger.debug(
+                        f"Not enough data for {symbol} in {year} week {week}: {days}"
+                    )
+                continue
+
+            first_weekday = df_week["weekday"].min()
+            df_week["diff"] = (
+                df_week["Open"]
+                / df_week[df_week["weekday"] == first_weekday].iloc[0]["Open"]
+            )
+            assert (
+                df_week.shape[0] >= number_of_good_working
+            ), f"Wrong number of weekdays in dataframe {df_week.shape} for year {year} {week}: {days}"
+
+            df_weeks = df_weeks.append(df_week)
+
+    return df_weeks[["year", "week", "weekday", "diff"]]
+
+
 def get_best_weekday(filename, limit=None):
-    symbols = DataFrame(__get_symbols(filename, limit))
-    symbols["interval"] = "1d"
-
-    symbols_dfs = pd.concat(
-        concurrent_map(_get_weekly_diffs, symbols.T.to_dict().values())
-    )
-
-    symbols_dfs = (
-        symbols_dfs[["weekday", "diff"]]
-        .groupby("weekday")
-        .mean()
-        .reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
-    )
-
-    symbols_dfs = symbols_dfs * 100
-    return symbols_dfs
+    return __wrapper(filename, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
-    symbol = df_symbols["Symbol"]
-    interval = df_symbols["interval"]
-    interval = "1d"
-    df = __get_history(symbol, interval)
-
-    first_month = calendar.month_name[1]
-    last_month = calendar.month_name[-1]
-
-    df = df.reset_index()
-    df["month"] = df["Date"].apply(lambda x: x.month)
-    df["year"] = df["Date"].apply(lambda x: x.year)
+    symbol = df_symbols["symbol"]
+    df = __update_dataframe(df_symbols["history"])
 
     df = df.groupby(["year", "month"], as_index=False).mean()
 
-    df["month"] = df["month"].apply(lambda x: calendar.month_name[x])
+    # Filter columns
+    df = df[["year", "month", "Open"]]
 
-    if df[df["month"] == first_month].empty:
-        return DataFrame()
+    df_months = DataFrame()
+    for year in df["year"].unique():
+        df_month = df[df["year"] == year]
+        if df_month.shape[0] < 12:
+            logger.debug(f"Not enough data for {symbol} in {year}")
+            continue
 
-    # Filteting NA in Open - this means usually a dividends
-    df = df[df["Open"].notna()]
+        first_month = df_month["month"].min()
+        df_month["diff"] = (
+            df_month["Open"]
+            / df_month[df_month["month"] == first_month].iloc[0]["Open"]
+        )
+        assert (
+            df_month.shape[0] == 12
+        ), f"Wrong number of month in dataframe {df_month.shape} for year {year}"
 
-    # getting first row that starts with Monday
-    df = df[df[df["month"] == first_month].index[0] :]
-    prev_monday_price = 0
-    full_months = []
-    is_january = False
-    is_december = False
-    months = []
-    for _, row in df.iterrows():
-        month = row["month"]
-        # filter months were all days were traiding days
-        is_january = month == first_month
-        is_december = month == last_month
+        df_months = df_months.append(df_month)
 
-        if is_january:
-            prev_monday_price = row["Open"]
-            price_diff = 1
-            months = [row]
-        else:
-            if prev_monday_price == 0:
-                continue
-            price_diff = row["Open"] / prev_monday_price
-            months.append(row)
-        row["diff"] = price_diff
-
-        # TODO: if there was a stock split - skip
-
-        if is_december and len(months) == 12:
-            full_months += months
-
-    logger.debug(f"{symbol} {len(full_months)} full months")
-
-    if not full_months:
-        return DataFrame()
-
-    df = DataFrame(full_months)
-
-    df["Symbol"] = symbol
-    return df
+    return df_months[["year", "month", "diff"]]
 
 
 def get_best_month(filename, limit=None):
-    symbols = DataFrame(__get_symbols(filename, limit))
-    symbols["interval"] = "1mo"
+    return __wrapper(filename, limit, _get_monthly_diffs)
 
-    symbols_dfs = pd.concat(
-        concurrent_map(_get_monthly_diffs, symbols.T.to_dict().values())
-    )
 
-    symbols_dfs = (
-        symbols_dfs[["month", "diff"]]
-        .groupby("month")
-        .mean()
-        .reindex([calendar.month_name[i] for i in range(1, 13)])
-    )
+def _get_month_day_diffs(df_symbols):
+    symbol = df_symbols["symbol"]
+    df = __update_dataframe(df_symbols["history"])
 
-    symbols_dfs = symbols_dfs * 100
+    # Filter columns
+    df = df[["year", "month", "day", "Open"]]
+
+    df_months = DataFrame()
+    for year in df["year"].unique():
+        for month in df["month"].unique():
+            df_month = df[(df["year"] == year) & (df["month"] == month)]
+            if df_month.empty:
+                continue
+            first_day = df_month["day"].min()
+            df_month["diff"] = (
+                df_month["Open"]
+                / df_month[df_month["day"] == first_day].iloc[0]["Open"]
+            )
+            if (
+                df_month.shape[0] >= 28 - 10
+            ):  # 28 days in shortest Feb, 10 days - weeknds max
+                df_months = df_months.append(df_month)
+            else:
+                logger.debug(f"Not enough data for {symbol} in {year}.{month}")
+
+    return df_months[["year", "month", "day", "diff"]]
+
+
+def get_best_month_day(filename, limit=None):
+    return __wrapper(filename, limit, _get_month_day_diffs)
+
+
+def __wrapper(filename, limit, func, post_func=None, interval="1d"):
+    symbols = __get_symbols(filename, limit)
+
+    history_data = __get_history(symbols.values.tolist(), interval)
+    symbols_with_history = [
+        {"symbol": symbol, "history": history_data[symbol]}
+        for symbol in history_data.columns.get_level_values(0).unique().to_list()
+    ]
+
+    symbols_dfs = pd.concat(concurrent_map(func, symbols_with_history))
+    if post_func:
+        symbols_dfs = post_func(symbols_dfs)
+
+    symbols_dfs["diff"] = symbols_dfs["diff"] * 100
+
+    symbols_dfs = symbols_dfs.convert_dtypes()
+
     return symbols_dfs

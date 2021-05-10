@@ -1,4 +1,3 @@
-import pytest
 from stocks.buy_sell_analysis.analysis import (
     Column,
     get_best_hour,
@@ -9,10 +8,14 @@ from stocks.buy_sell_analysis.analysis import (
     get_best_weekday,
 )
 
+START_DATE = "2020-01-01"
+END_DATE = "2021-01-01"
+FILENAME = "sp500.csv"
+
 
 def test_best_month():
-    df = get_best_month("sp500.csv", limit=5)
-    df2018 = df[df[Column.YEAR] == 2018]
+    df = get_best_month(FILENAME, START_DATE, END_DATE, limit=5)
+    df2018 = df[df[Column.YEAR] == 2020]
     assert not df2018.empty
     assert (
         df2018[df2018[Column.MONTH] == 1][Column.PERCENT].mean()
@@ -21,7 +24,7 @@ def test_best_month():
 
 
 def test_best_month_day():
-    df = get_best_month_day("sp500.csv", limit=5)
+    df = get_best_month_day(FILENAME, START_DATE, END_DATE, limit=5)
     df_jan = df[df[Column.MONTH] == 7]
     assert not df_jan.empty
     assert (
@@ -31,7 +34,7 @@ def test_best_month_day():
 
 
 def test_best_weekday():
-    df = get_best_weekday("sp500.csv", limit=5)
+    df = get_best_weekday(FILENAME, START_DATE, END_DATE, limit=5)
     assert not df.empty
     assert (
         df[df[Column.WEEKDAY] == 0][Column.PERCENT].mean()
@@ -40,9 +43,7 @@ def test_best_weekday():
 
 
 def test_best_hour():
-    df = get_best_hour(
-        "sp500.csv", limit=5, start_date="2020-12-01", end_date="2021-01-01"
-    )
+    df = get_best_hour(FILENAME, START_DATE, END_DATE, limit=5)
     assert not df.empty
     assert (
         df[df[Column.HOUR] == 9][Column.PERCENT].mean()
@@ -52,7 +53,7 @@ def test_best_hour():
 
 def test_best_15mins():
     df = get_best_quarter(
-        "sp500.csv", limit=5, start_date="2021-04-01", end_date="2021-05-01"
+        FILENAME, limit=5, start_date="2021-04-01", end_date="2021-05-01"
     )
     assert not df.empty
     assert (
@@ -63,7 +64,7 @@ def test_best_15mins():
 
 def test_best_time_hour_and_minute():
     df = get_best_time(
-        "sp500.csv", limit=5, start_date="2021-04-01", end_date="2021-05-01"
+        FILENAME, limit=5, start_date="2021-04-01", end_date="2021-05-01"
     )
     assert not df.empty
     assert (

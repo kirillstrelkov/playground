@@ -7,10 +7,6 @@ from loguru import logger
 from pandas.core.frame import DataFrame
 from utils.misc import concurrent_map
 
-START_DATE = "2001-01-01"
-START_DATE = "2011-01-01"
-END_DATE = "2019-01-01"
-
 
 class Column(object):
     OPEN = "Open"
@@ -32,18 +28,21 @@ class Column(object):
     QUARTER = "quarter"
 
 
-def __get_history(symbols, interval, start_date=None, end_date=None):
-    if start_date is None:
-        start_date = START_DATE
+__CACHE = {}
 
-    if end_date is None:
-        end_date = END_DATE
 
-    df = yf.download(
-        symbols, interval=interval, start=start_date, end=end_date, group_by="ticker"
-    )
+def __get_history(symbols, start_date, end_date, interval):
+    key = (str(symbols), start_date, end_date, interval)
+    if key not in __CACHE:
+        __CACHE[key] = yf.download(
+            symbols,
+            interval=interval,
+            start=start_date,
+            end=end_date,
+            group_by="ticker",
+        )
 
-    return df
+    return __CACHE[key]
 
 
 def __get_date_column_name(df):
@@ -128,8 +127,8 @@ def _get_best_weekday_diffs(df_symbols):
     return df_weeks[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.PERCENT]]
 
 
-def get_best_weekday(filename, limit=None):
-    return __wrapper(filename, limit, _get_best_weekday_diffs)
+def get_best_weekday(filename, start_date, end_date, limit=None):
+    return __wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
@@ -162,8 +161,8 @@ def _get_monthly_diffs(df_symbols):
     return df_months[[Column.YEAR, Column.MONTH, Column.PERCENT]]
 
 
-def get_best_month(filename, limit=None):
-    return __wrapper(filename, limit, _get_monthly_diffs)
+def get_best_month(filename, start_date, end_date, limit=None):
+    return __wrapper(filename, start_date, end_date, limit, _get_monthly_diffs)
 
 
 def _get_month_day_diffs(df_symbols):
@@ -194,17 +193,15 @@ def _get_month_day_diffs(df_symbols):
     return df_months[[Column.YEAR, Column.MONTH, Column.DAY, Column.PERCENT]]
 
 
-def get_best_month_day(filename, limit=None):
-    return __wrapper(filename, limit, _get_month_day_diffs)
+def get_best_month_day(filename, start_date, end_date, limit=None):
+    return __wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
 
 
-def __wrapper(
-    filename, limit, func, post_func=None, interval="1d", start_date=None, end_date=None
-):
+def __wrapper(filename, start_date, end_date, limit, func, interval="1d"):
     symbols = __get_symbols(filename, limit)
 
     history_data = __get_history(
-        symbols.values.tolist(), interval, start_date=start_date, end_date=end_date
+        symbols.values.tolist(), start_date, end_date, interval
     )
     symbols_with_history = [
         {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
@@ -212,8 +209,6 @@ def __wrapper(
     ]
 
     symbols_dfs = pd.concat(concurrent_map(func, symbols_with_history))
-    if post_func:
-        symbols_dfs = post_func(symbols_dfs)
 
     symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
 
@@ -258,14 +253,14 @@ def _get_hour_diffs(df_symbols):
     return df_days[[Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.PERCENT]]
 
 
-def get_best_hour(filename, limit=None, start_date=None, end_date=None):
+def get_best_hour(filename, start_date, end_date, limit=None):
     return __wrapper(
         filename,
+        start_date,
+        end_date,
         limit,
         _get_hour_diffs,
         interval="60m",
-        start_date=start_date,
-        end_date=end_date,
     )
 
 
@@ -324,15 +319,15 @@ def _get_quarter_diffs(df_symbols):
     ]
 
 
-def get_best_quarter(filename, limit=None, start_date=None, end_date=None):
+def get_best_quarter(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
     return __wrapper(
         filename,
+        start_date,
+        end_date,
         limit,
         _get_quarter_diffs,
         interval="15m",
-        start_date=start_date,
-        end_date=end_date,
     )
 
 
@@ -391,13 +386,13 @@ def _get_time_diffs(df_symbols):
     ]
 
 
-def get_best_time(filename, limit=None, start_date=None, end_date=None):
+def get_best_time(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
     return __wrapper(
         filename,
+        start_date,
+        end_date,
         limit,
         _get_time_diffs,
         interval="15m",
-        start_date=start_date,
-        end_date=end_date,
     )

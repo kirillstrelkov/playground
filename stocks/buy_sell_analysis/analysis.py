@@ -24,22 +24,38 @@ class Column(object):
     WEEKDAY = "weekday"
     WEEK = "week"
     DATE = "Date"
+    DATETIME = "Datetime"
     SYMBOL = "Symbol"
     PERCENT = "percent"
     HISTORY = "history"
 
 
-def __get_history(symbols, interval):
+def __get_history(symbols, interval, start_date=None, end_date=None):
+    if start_date is None:
+        start_date = START_DATE
+
+    if end_date is None:
+        end_date = END_DATE
+
     df = yf.download(
-        symbols, interval=interval, start=START_DATE, end=END_DATE, group_by="ticker"
+        symbols, interval=interval, start=start_date, end=end_date, group_by="ticker"
     )
 
     return df
 
 
+def __get_date_column_name(df):
+    if Column.DATETIME in df.columns:
+        return Column.DATETIME
+    else:
+        return Column.DATE
+
+
 def __update_dataframe(df):
     df = df.reset_index()
 
+    date_column = __get_date_column_name(df)
+    df_date = df[date_column]
     for component in [
         Column.YEAR,
         Column.MONTH,
@@ -47,12 +63,12 @@ def __update_dataframe(df):
         Column.HOUR,
         Column.MINUTE,
     ]:
-        df[component] = df[Column.DATE].apply(lambda x: getattr(x, component))
+        df[component] = df_date.apply(lambda x: getattr(x, component))
 
-    df[Column.DAY_NAME] = df[Column.DATE].apply(lambda x: x.day_name())
-    df[Column.MONTH_NAME] = df[Column.DATE].apply(lambda x: x.month_name())
-    df[Column.WEEKDAY] = df[Column.DATE].apply(lambda x: x.weekday())
-    df[Column.WEEK] = df[Column.DATE].apply(lambda x: x.isocalendar()[1])
+    df[Column.DAY_NAME] = df_date.apply(lambda x: x.day_name())
+    df[Column.MONTH_NAME] = df_date.apply(lambda x: x.month_name())
+    df[Column.WEEKDAY] = df_date.apply(lambda x: x.weekday())
+    df[Column.WEEK] = df_date.apply(lambda x: x.isocalendar()[1])
 
     # Filteting NA in Open - this means usually a dividends
     df = df[df[Column.OPEN].notna()]
@@ -180,10 +196,14 @@ def get_best_month_day(filename, limit=None):
     return __wrapper(filename, limit, _get_month_day_diffs)
 
 
-def __wrapper(filename, limit, func, post_func=None, interval="1d"):
+def __wrapper(
+    filename, limit, func, post_func=None, interval="1d", start_date=None, end_date=None
+):
     symbols = __get_symbols(filename, limit)
 
-    history_data = __get_history(symbols.values.tolist(), interval)
+    history_data = __get_history(
+        symbols.values.tolist(), interval, start_date=start_date, end_date=end_date
+    )
     symbols_with_history = [
         {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
         for symbol in history_data.columns.get_level_values(0).unique().to_list()
@@ -198,3 +218,50 @@ def __wrapper(filename, limit, func, post_func=None, interval="1d"):
     symbols_dfs = symbols_dfs.convert_dtypes()
 
     return symbols_dfs
+
+
+def _get_hour_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df_history = df_symbols[Column.HISTORY]
+
+    df = __update_dataframe(df_history)
+
+    hours = df[Column.HOUR].unique()
+    assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours.values}"
+
+    # Filter columns
+    df = df[[Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.OPEN]]
+
+    df_days = DataFrame()
+    for year in df[Column.YEAR].unique():
+        for week in df[Column.WEEK].unique():
+            for day in df[Column.DAY].unique():
+                df_day = df[
+                    (df[Column.YEAR] == year)
+                    & (df[Column.WEEK] == week)
+                    & (df[Column.DAY] == day)
+                ]
+                if df_day.empty:
+                    continue
+                first_hour = df_day[Column.HOUR].min()
+                df_day[Column.PERCENT] = (
+                    df_day[Column.OPEN]
+                    / df_day[df_day[Column.HOUR] == first_hour].iloc[0][Column.OPEN]
+                )
+                if df_day.shape[0] >= 5:  # good data is at least 5 hours per day
+                    df_days = df_days.append(df_day)
+                else:
+                    logger.debug(f"Not enough data for {symbol} in {week} {day}")
+
+    return df_days[[Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.PERCENT]]
+
+
+def get_best_hour(filename, limit=None, start_date=None, end_date=None):
+    return __wrapper(
+        filename,
+        limit,
+        _get_hour_diffs,
+        interval="60m",
+        start_date=start_date,
+        end_date=end_date,
+    )

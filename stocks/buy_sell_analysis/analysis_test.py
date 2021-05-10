@@ -1,6 +1,7 @@
 import pytest
 from stocks.buy_sell_analysis.analysis import (
     Column,
+    get_best_hour,
     get_best_month,
     get_best_month_day,
     get_best_weekday,
@@ -36,9 +37,15 @@ def test_best_weekday():
     )
 
 
-@pytest.mark.skip(reason="wip")
 def test_best_hour():
-    pass
+    df = get_best_hour(
+        "sp500.csv", limit=5, start_date="2020-12-01", end_date="2021-01-01"
+    )
+    assert not df.empty
+    assert (
+        df[df[Column.HOUR] == 9][Column.PERCENT].mean()
+        < df[df[Column.HOUR] == 15][Column.PERCENT].mean()
+    )
 
 
 @pytest.mark.skip(reason="wip")

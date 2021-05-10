@@ -4,6 +4,8 @@ from stocks.buy_sell_analysis.analysis import (
     get_best_hour,
     get_best_month,
     get_best_month_day,
+    get_best_quarter,
+    get_best_time,
     get_best_weekday,
 )
 
@@ -48,11 +50,23 @@ def test_best_hour():
     )
 
 
-@pytest.mark.skip(reason="wip")
 def test_best_15mins():
-    pass
+    df = get_best_quarter(
+        "sp500.csv", limit=5, start_date="2021-04-01", end_date="2021-05-01"
+    )
+    assert not df.empty
+    assert (
+        df[df[Column.QUARTER] == 0][Column.PERCENT].mean()
+        < df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
+    )
 
 
-@pytest.mark.skip(reason="wip")
 def test_best_time_hour_and_minute():
-    pass
+    df = get_best_time(
+        "sp500.csv", limit=5, start_date="2021-04-01", end_date="2021-05-01"
+    )
+    assert not df.empty
+    assert (
+        df[df[Column.TIME] == 9.5][Column.PERCENT].mean()
+        < df[df[Column.TIME] == 10.5][Column.PERCENT].mean()
+    )

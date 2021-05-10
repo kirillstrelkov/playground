@@ -28,6 +28,8 @@ class Column(object):
     SYMBOL = "Symbol"
     PERCENT = "percent"
     HISTORY = "history"
+    TIME = "time"
+    QUARTER = "quarter"
 
 
 def __get_history(symbols, interval, start_date=None, end_date=None):
@@ -262,6 +264,140 @@ def get_best_hour(filename, limit=None, start_date=None, end_date=None):
         limit,
         _get_hour_diffs,
         interval="60m",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def _get_quarter_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df_history = df_symbols[Column.HISTORY]
+
+    df = __update_dataframe(df_history)
+
+    minutes = df[Column.MINUTE].unique()
+    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
+
+    # Filter columns
+    df = df[
+        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.MINUTE, Column.OPEN]
+    ]
+
+    df_days = DataFrame()
+    for year in df[Column.YEAR].unique():
+        for week in df[Column.WEEK].unique():
+            for day in df[Column.DAY].unique():
+                for hour in df[Column.HOUR].unique():
+                    df_hour = df[
+                        (df[Column.YEAR] == year)
+                        & (df[Column.WEEK] == week)
+                        & (df[Column.DAY] == day)
+                        & (df[Column.HOUR] == hour)
+                    ]
+                    if df_hour.empty:
+                        continue
+                    first_time = df_hour[Column.MINUTE].min()
+                    df_hour[Column.PERCENT] = (
+                        df_hour[Column.OPEN]
+                        / df_hour[df_hour[Column.MINUTE] == first_time].iloc[0][
+                            Column.OPEN
+                        ]
+                    )
+                    if (
+                        df_hour.shape[0] >= 2
+                    ):  # good data is at least 2 times per hour (9:30, 9:45)
+                        df_days = df_days.append(df_hour)
+                    else:
+                        logger.debug(f"Not enough data for {symbol} in {week} {day}")
+
+    df_days[Column.QUARTER] = df_days[Column.MINUTE]
+    return df_days[
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.DAY,
+            Column.HOUR,
+            Column.MINUTE,
+            Column.QUARTER,
+            Column.PERCENT,
+        ]
+    ]
+
+
+def get_best_quarter(filename, limit=None, start_date=None, end_date=None):
+    # The requested range must be within the last 60 days.
+    return __wrapper(
+        filename,
+        limit,
+        _get_quarter_diffs,
+        interval="15m",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def _get_time_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df_history = df_symbols[Column.HISTORY]
+
+    df = __update_dataframe(df_history)
+
+    minutes = df[Column.MINUTE].unique()
+    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
+
+    # Filter columns
+    df = df[
+        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.MINUTE, Column.OPEN]
+    ]
+
+    df_days = DataFrame()
+    for year in df[Column.YEAR].unique():
+        for week in df[Column.WEEK].unique():
+            for day in df[Column.DAY].unique():
+                for hour in df[Column.HOUR].unique():
+                    df_hour = df[
+                        (df[Column.YEAR] == year)
+                        & (df[Column.WEEK] == week)
+                        & (df[Column.DAY] == day)
+                        & (df[Column.HOUR] == hour)
+                    ]
+                    if df_hour.empty:
+                        continue
+                    first_time = df_hour[Column.MINUTE].min()
+                    df_hour[Column.PERCENT] = (
+                        df_hour[Column.OPEN]
+                        / df_hour[df_hour[Column.MINUTE] == first_time].iloc[0][
+                            Column.OPEN
+                        ]
+                    )
+                    if (
+                        df_hour.shape[0] >= 2
+                    ):  # good data is at least 2 times per hour (9:30, 9:45)
+                        df_days = df_days.append(df_hour)
+                    else:
+                        logger.debug(f"Not enough data for {symbol} in {week} {day}")
+
+    df_days[Column.TIME] = df_days.apply(lambda x: x["hour"] + x["minute"] / 60, axis=1)
+    return df_days[
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.DAY,
+            Column.HOUR,
+            Column.MINUTE,
+            Column.TIME,
+            Column.PERCENT,
+        ]
+    ]
+
+
+def get_best_time(filename, limit=None, start_date=None, end_date=None):
+    # The requested range must be within the last 60 days.
+    return __wrapper(
+        filename,
+        limit,
+        _get_time_diffs,
+        interval="15m",
         start_date=start_date,
         end_date=end_date,
     )

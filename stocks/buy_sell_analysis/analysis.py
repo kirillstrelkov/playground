@@ -25,7 +25,7 @@ class Column(object):
     WEEK = "week"
     DATE = "Date"
     SYMBOL = "Symbol"
-    PERCENT = "diff"
+    PERCENT = "percent"
     HISTORY = "history"
 
 

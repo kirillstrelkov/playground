@@ -1,82 +1,11 @@
-import calendar
 import os
 
+import numpy as np
 import pandas as pd
-import yfinance as yf
 from loguru import logger
 from pandas.core.frame import DataFrame
+from stocks.buy_sell_analysis.common import Column, get_history, update_dataframe
 from utils.misc import concurrent_map
-
-
-class Column(object):
-    OPEN = "Open"
-    YEAR = "year"
-    MONTH = "month"
-    DAY = "day"
-    HOUR = "hour"
-    MINUTE = "minute"
-    DAY_NAME = "day_name"
-    MONTH_NAME = "month_name"
-    WEEKDAY = "weekday"
-    WEEK = "week"
-    DATE = "Date"
-    DATETIME = "Datetime"
-    SYMBOL = "Symbol"
-    PERCENT = "percent"
-    HISTORY = "history"
-    TIME = "time"
-    QUARTER = "quarter"
-
-
-__CACHE = {}
-
-
-def __get_history(symbols, start_date, end_date, interval):
-    key = (str(symbols), start_date, end_date, interval)
-    if key not in __CACHE:
-        __CACHE[key] = yf.download(
-            symbols,
-            interval=interval,
-            start=start_date,
-            end=end_date,
-            group_by="ticker",
-        )
-
-    return __CACHE[key]
-
-
-def __get_date_column_name(df):
-    if Column.DATETIME in df.columns:
-        return Column.DATETIME
-    else:
-        return Column.DATE
-
-
-def __update_dataframe(df, symbol):
-    df = df.reset_index()
-
-    date_column = __get_date_column_name(df)
-    df_date = df[date_column]
-    for component in [
-        Column.YEAR,
-        Column.MONTH,
-        Column.DAY,
-        Column.HOUR,
-        Column.MINUTE,
-    ]:
-        df[component] = df_date.apply(lambda x: getattr(x, component))
-
-    df[Column.DAY_NAME] = df_date.apply(lambda x: x.day_name())
-    df[Column.MONTH_NAME] = df_date.apply(lambda x: x.month_name())
-    df[Column.WEEKDAY] = df_date.apply(lambda x: x.weekday())
-    df[Column.WEEK] = df_date.apply(lambda x: x.isocalendar()[1])
-
-    # Filteting NA in Open - this means usually a dividends
-    df = df[df[Column.OPEN].notna()]
-
-    df[Column.SYMBOL] = symbol
-
-    return df
 
 
 def __get_symbols(filename, limit):
@@ -91,7 +20,7 @@ def __get_symbols(filename, limit):
 
 def _get_best_weekday_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # if number of working days less than 3 - don't count
     number_of_good_working = 3
@@ -135,7 +64,7 @@ def get_best_weekday(filename, start_date, end_date, limit=None):
 
 def _get_monthly_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # Filter columns
     df = df[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.OPEN]]
@@ -169,7 +98,7 @@ def get_best_month(filename, start_date, end_date, limit=None):
 
 def _get_month_day_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # Filter columns
     df = df[[Column.YEAR, Column.MONTH, Column.DAY, Column.OPEN]]
@@ -202,9 +131,7 @@ def get_best_month_day(filename, start_date, end_date, limit=None):
 def __wrapper(filename, start_date, end_date, limit, func, interval="1d"):
     symbols = __get_symbols(filename, limit)
 
-    history_data = __get_history(
-        symbols.values.tolist(), start_date, end_date, interval
-    )
+    history_data = get_history(symbols.values.tolist(), start_date, end_date, interval)
     symbols_with_history = [
         {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
         for symbol in history_data.columns.get_level_values(0).unique().to_list()
@@ -223,7 +150,7 @@ def _get_hour_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history, symbol)
+    df = update_dataframe(df_history, symbol)
 
     hours = df[Column.HOUR].unique()
     assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours.values}"
@@ -281,7 +208,7 @@ def _get_quarter_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history, symbol)
+    df = update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
     assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
@@ -357,7 +284,7 @@ def _get_time_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history, symbol)
+    df = update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
     assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"

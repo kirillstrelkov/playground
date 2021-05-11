@@ -48,7 +48,7 @@ def test_best_hour():
     assert not df.empty
     assert (
         df[df[Column.HOUR] == 9][Column.PERCENT].mean()
-        > df[df[Column.HOUR] == 15][Column.PERCENT].mean()
+        < df[df[Column.HOUR] == 15][Column.PERCENT].mean()
     )
 
 

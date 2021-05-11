@@ -52,7 +52,7 @@ def __get_date_column_name(df):
         return Column.DATE
 
 
-def __update_dataframe(df):
+def __update_dataframe(df, symbol):
     df = df.reset_index()
 
     date_column = __get_date_column_name(df)
@@ -74,6 +74,8 @@ def __update_dataframe(df):
     # Filteting NA in Open - this means usually a dividends
     df = df[df[Column.OPEN].notna()]
 
+    df[Column.SYMBOL] = symbol
+
     return df
 
 
@@ -89,13 +91,13 @@ def __get_symbols(filename, limit):
 
 def _get_best_weekday_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY])
+    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # if number of working days less than 3 - don't count
     number_of_good_working = 3
 
     # Filter columns
-    df = df[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.OPEN]]
+    df = df[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.SYMBOL, Column.OPEN]]
 
     df_weeks = DataFrame()
     for year in df[Column.YEAR].unique():
@@ -133,12 +135,10 @@ def get_best_weekday(filename, start_date, end_date, limit=None):
 
 def _get_monthly_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY])
-
-    df = df.groupby([Column.YEAR, Column.MONTH], as_index=False).mean()
+    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # Filter columns
-    df = df[[Column.YEAR, Column.MONTH, Column.OPEN]]
+    df = df[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.OPEN]]
 
     df_months = DataFrame()
     for year in df[Column.YEAR].unique():
@@ -158,16 +158,18 @@ def _get_monthly_diffs(df_symbols):
 
         df_months = df_months.append(df_month)
 
-    return df_months[[Column.YEAR, Column.MONTH, Column.PERCENT]]
+    return df_months[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
 
 
 def get_best_month(filename, start_date, end_date, limit=None):
-    return __wrapper(filename, start_date, end_date, limit, _get_monthly_diffs)
+    return __wrapper(
+        filename, start_date, end_date, limit, _get_monthly_diffs, interval="1mo"
+    )
 
 
 def _get_month_day_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
-    df = __update_dataframe(df_symbols[Column.HISTORY])
+    df = __update_dataframe(df_symbols[Column.HISTORY], symbol)
 
     # Filter columns
     df = df[[Column.YEAR, Column.MONTH, Column.DAY, Column.OPEN]]
@@ -221,13 +223,15 @@ def _get_hour_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history)
+    df = __update_dataframe(df_history, symbol)
 
     hours = df[Column.HOUR].unique()
     assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours.values}"
 
     # Filter columns
-    df = df[[Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.OPEN]]
+    df = df[
+        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.SYMBOL, Column.OPEN]
+    ]
 
     df_days = DataFrame()
     for year in df[Column.YEAR].unique():
@@ -250,7 +254,16 @@ def _get_hour_diffs(df_symbols):
                 else:
                     logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
-    return df_days[[Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.PERCENT]]
+    return df_days[
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.DAY,
+            Column.HOUR,
+            Column.SYMBOL,
+            Column.PERCENT,
+        ]
+    ]
 
 
 def get_best_hour(filename, start_date, end_date, limit=None):
@@ -268,14 +281,22 @@ def _get_quarter_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history)
+    df = __update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
     assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
 
     # Filter columns
     df = df[
-        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.MINUTE, Column.OPEN]
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.DAY,
+            Column.HOUR,
+            Column.MINUTE,
+            Column.SYMBOL,
+            Column.OPEN,
+        ]
     ]
 
     df_days = DataFrame()
@@ -314,6 +335,7 @@ def _get_quarter_diffs(df_symbols):
             Column.HOUR,
             Column.MINUTE,
             Column.QUARTER,
+            Column.SYMBOL,
             Column.PERCENT,
         ]
     ]
@@ -335,44 +357,49 @@ def _get_time_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df_history = df_symbols[Column.HISTORY]
 
-    df = __update_dataframe(df_history)
+    df = __update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
     assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
 
     # Filter columns
     df = df[
-        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.MINUTE, Column.OPEN]
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.DAY,
+            Column.HOUR,
+            Column.MINUTE,
+            Column.SYMBOL,
+            Column.OPEN,
+        ]
     ]
+
+    df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
     df_days = DataFrame()
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
-                for hour in df[Column.HOUR].unique():
-                    df_hour = df[
-                        (df[Column.YEAR] == year)
-                        & (df[Column.WEEK] == week)
-                        & (df[Column.DAY] == day)
-                        & (df[Column.HOUR] == hour)
-                    ]
-                    if df_hour.empty:
-                        continue
-                    first_time = df_hour[Column.MINUTE].min()
-                    df_hour[Column.PERCENT] = (
-                        df_hour[Column.OPEN]
-                        / df_hour[df_hour[Column.MINUTE] == first_time].iloc[0][
-                            Column.OPEN
-                        ]
-                    )
-                    if (
-                        df_hour.shape[0] >= 2
-                    ):  # good data is at least 2 times per hour (9:30, 9:45)
-                        df_days = df_days.append(df_hour)
-                    else:
-                        logger.debug(f"Not enough data for {symbol} in {week} {day}")
+                df_hour = df[
+                    (df[Column.YEAR] == year)
+                    & (df[Column.WEEK] == week)
+                    & (df[Column.DAY] == day)
+                ]
+                if df_hour.empty:
+                    continue
+                first_time = df_hour[Column.TIME].min()
+                df_hour[Column.PERCENT] = (
+                    df_hour[Column.OPEN]
+                    / df_hour[df_hour[Column.TIME] == first_time].iloc[0][Column.OPEN]
+                )
+                if (
+                    df_hour.shape[0] >= 2
+                ):  # good data is at least 2 times per hour (9:30, 9:45)
+                    df_days = df_days.append(df_hour)
+                else:
+                    logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
-    df_days[Column.TIME] = df_days.apply(lambda x: x["hour"] + x["minute"] / 60, axis=1)
     return df_days[
         [
             Column.YEAR,
@@ -381,6 +408,7 @@ def _get_time_diffs(df_symbols):
             Column.HOUR,
             Column.MINUTE,
             Column.TIME,
+            Column.SYMBOL,
             Column.PERCENT,
         ]
     ]

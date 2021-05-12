@@ -25,7 +25,7 @@ class Column(object):
     DATE = "Date"
     DATETIME = "Datetime"
     SYMBOL = "Symbol"
-    PERCENT = "percent"
+    PERCENT = "Percent (mean)"
     HISTORY = "history"
     TIME = "time"
     QUARTER = "quarter"

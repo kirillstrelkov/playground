@@ -320,25 +320,3 @@ def get_best_week(filename, start_date, end_date, limit=None):
         _get_week_diffs,
         interval="1wk",
     )
-
-
-if __name__ == "__main__":
-    pd.options.mode.chained_assignment = None
-    logger.remove()
-    logger.add(os.sys.stdout, level="INFO")
-
-    START_DATE = "2011-01-01"
-    END_DATE = "2021-01-01"
-    FILENAME = "sp500.csv"
-    LIMIT = None
-    # df = get_best_month_day(FILENAME, START_DATE, END_DATE, limit=LIMIT)
-
-    START_DATE = "2019-06-01"
-    END_DATE = "2021-05-01"
-
-    # df = get_best_hour(FILENAME, START_DATE, END_DATE, limit=LIMIT)
-
-    START_DATE = "2021-04-01"
-    END_DATE = "2021-05-01"
-    df = get_best_time(FILENAME, START_DATE, END_DATE, limit=LIMIT)
-    print(df)

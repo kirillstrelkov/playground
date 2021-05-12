@@ -40,7 +40,9 @@ def _get_best_weekday_diffs(df_symbols):
 
             df_weeks = df_weeks.append(df_week)
 
-    return df_weeks[Column.ALL]
+    return df_weeks[
+        [Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.SYMBOL, Column.PERCENT]
+    ]
 
 
 def get_best_weekday(filename, start_date, end_date, limit=None):
@@ -69,7 +71,7 @@ def _get_monthly_diffs(df_symbols):
 
         df_months = df_months.append(df_month)
 
-    return df_months[Column.ALL]
+    return df_months[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
 
 
 def get_best_month(filename, start_date, end_date, limit=None):
@@ -103,7 +105,9 @@ def _get_month_day_diffs(df_symbols):
             else:
                 logger.debug(f"Not enough data for {symbol} in {year}.{month}")
 
-    return df_months[[Column.YEAR, Column.MONTH, Column.DAY, Column.PERCENT]]
+    return df_months[
+        [Column.YEAR, Column.MONTH, Column.DAY, Column.SYMBOL, Column.PERCENT]
+    ]
 
 
 def get_best_month_day(filename, start_date, end_date, limit=None):
@@ -308,7 +312,7 @@ def _get_week_diffs(df_symbols):
 
         df_months = df_months.append(df_month)
 
-    return df_months[Column.ALL]
+    return df_months[[Column.YEAR, Column.WEEK, Column.SYMBOL, Column.PERCENT]]
 
 
 def get_best_week(filename, start_date, end_date, limit=None):

@@ -6,9 +6,10 @@ from stocks.buy_sell_analysis.analysis_base_first_date import (
     get_best_quarter,
     get_best_time,
     get_best_weekday,
+    get_best_week,
 )
 
-START_DATE = "2019-02-01"
+START_DATE = "2019-01-01"
 END_DATE = "2021-01-01"
 FILENAME = "sp500.csv"
 LIMIT = 5
@@ -72,4 +73,13 @@ def test_best_time_hour_and_minute():
     assert (
         df[df[Column.TIME] == 9.5][Column.PERCENT].mean()
         < df[df[Column.TIME] == 10.5][Column.PERCENT].mean()
+    )
+
+
+def test_best_week():
+    df = get_best_week(FILENAME, limit=5, start_date=START_DATE, end_date=END_DATE)
+    assert not df.empty
+    assert (
+        df[df[Column.WEEK] == 15][Column.PERCENT].mean()
+        < df[df[Column.WEEK] == 40][Column.PERCENT].mean()
     )

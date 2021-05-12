@@ -1,21 +1,9 @@
 import os
 
-import numpy as np
 import pandas as pd
 from loguru import logger
 from pandas.core.frame import DataFrame
-from stocks.buy_sell_analysis.common import Column, get_history, update_dataframe
-from utils.misc import concurrent_map
-
-
-def __get_symbols(filename, limit):
-    df = pd.read_csv(os.path.join(os.path.dirname(__file__), filename))
-    symbols = df[Column.SYMBOL]
-
-    if limit:
-        symbols = symbols[:limit]
-
-    return symbols
+from stocks.buy_sell_analysis.common import Column, update_dataframe, wrapper
 
 
 def _get_best_weekday_diffs(df_symbols):
@@ -25,10 +13,7 @@ def _get_best_weekday_diffs(df_symbols):
     # if number of working days less than 3 - don't count
     number_of_good_working = 3
 
-    # Filter columns
-    df = df[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.SYMBOL, Column.OPEN]]
-
-    df_weeks = DataFrame()
+    df_weeks = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             df_week = df[(df[Column.YEAR] == year) & (df[Column.WEEK] == week)]
@@ -55,21 +40,18 @@ def _get_best_weekday_diffs(df_symbols):
 
             df_weeks = df_weeks.append(df_week)
 
-    return df_weeks[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.PERCENT]]
+    return df_weeks[Column.ALL]
 
 
 def get_best_weekday(filename, start_date, end_date, limit=None):
-    return __wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
+    return wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
-    # Filter columns
-    df = df[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.OPEN]]
-
-    df_months = DataFrame()
+    df_months = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         df_month = df[df[Column.YEAR] == year]
         if df_month.shape[0] < 12:
@@ -87,11 +69,11 @@ def _get_monthly_diffs(df_symbols):
 
         df_months = df_months.append(df_month)
 
-    return df_months[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
+    return df_months[Column.ALL]
 
 
 def get_best_month(filename, start_date, end_date, limit=None):
-    return __wrapper(
+    return wrapper(
         filename, start_date, end_date, limit, _get_monthly_diffs, interval="1mo"
     )
 
@@ -100,10 +82,10 @@ def _get_month_day_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
-    # Filter columns
-    df = df[[Column.YEAR, Column.MONTH, Column.DAY, Column.OPEN]]
+    if df.empty:
+        return df
 
-    df_months = DataFrame()
+    df_months = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for month in df[Column.MONTH].unique():
             df_month = df[(df[Column.YEAR] == year) & (df[Column.MONTH] == month)]
@@ -125,25 +107,7 @@ def _get_month_day_diffs(df_symbols):
 
 
 def get_best_month_day(filename, start_date, end_date, limit=None):
-    return __wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
-
-
-def __wrapper(filename, start_date, end_date, limit, func, interval="1d"):
-    symbols = __get_symbols(filename, limit)
-
-    history_data = get_history(symbols.values.tolist(), start_date, end_date, interval)
-    symbols_with_history = [
-        {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
-        for symbol in history_data.columns.get_level_values(0).unique().to_list()
-    ]
-
-    symbols_dfs = pd.concat(concurrent_map(func, symbols_with_history))
-
-    symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
-
-    symbols_dfs = symbols_dfs.convert_dtypes()
-
-    return symbols_dfs
+    return wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
 
 
 def _get_hour_diffs(df_symbols):
@@ -153,14 +117,9 @@ def _get_hour_diffs(df_symbols):
     df = update_dataframe(df_history, symbol)
 
     hours = df[Column.HOUR].unique()
-    assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours.values}"
+    assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours}"
 
-    # Filter columns
-    df = df[
-        [Column.YEAR, Column.WEEK, Column.DAY, Column.HOUR, Column.SYMBOL, Column.OPEN]
-    ]
-
-    df_days = DataFrame()
+    df_days = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -194,7 +153,7 @@ def _get_hour_diffs(df_symbols):
 
 
 def get_best_hour(filename, start_date, end_date, limit=None):
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
@@ -211,22 +170,9 @@ def _get_quarter_diffs(df_symbols):
     df = update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
-    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
+    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes}"
 
-    # Filter columns
-    df = df[
-        [
-            Column.YEAR,
-            Column.WEEK,
-            Column.DAY,
-            Column.HOUR,
-            Column.MINUTE,
-            Column.SYMBOL,
-            Column.OPEN,
-        ]
-    ]
-
-    df_days = DataFrame()
+    df_days = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -270,7 +216,7 @@ def _get_quarter_diffs(df_symbols):
 
 def get_best_quarter(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
@@ -287,24 +233,11 @@ def _get_time_diffs(df_symbols):
     df = update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
-    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes.values}"
-
-    # Filter columns
-    df = df[
-        [
-            Column.YEAR,
-            Column.WEEK,
-            Column.DAY,
-            Column.HOUR,
-            Column.MINUTE,
-            Column.SYMBOL,
-            Column.OPEN,
-        ]
-    ]
+    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes}"
 
     df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
-    df_days = DataFrame()
+    df_days = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -343,7 +276,7 @@ def _get_time_diffs(df_symbols):
 
 def get_best_time(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
@@ -351,3 +284,61 @@ def get_best_time(filename, start_date, end_date, limit=None):
         _get_time_diffs,
         interval="15m",
     )
+
+
+def _get_week_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol)
+
+    df_months = DataFrame(columns=Column.ALL)
+    for year in df[Column.YEAR].unique():
+        df_month = df[df[Column.YEAR] == year]
+        if df_month.shape[0] < 50:
+            logger.debug(f"Not enough data for {symbol} in {year}")
+            continue
+
+        first = df_month[Column.WEEK].min()
+        df_month[Column.PERCENT] = (
+            df_month[Column.OPEN]
+            / df_month[df_month[Column.WEEK] == first].iloc[0][Column.OPEN]
+        )
+        assert (
+            df_month.shape[0] > 50
+        ), f"Wrong number of month in dataframe {df_month.shape} for year {year}"
+
+        df_months = df_months.append(df_month)
+
+    return df_months[Column.ALL]
+
+
+def get_best_week(filename, start_date, end_date, limit=None):
+    return wrapper(
+        filename,
+        start_date,
+        end_date,
+        limit,
+        _get_week_diffs,
+        interval="1wk",
+    )
+
+
+if __name__ == "__main__":
+    pd.options.mode.chained_assignment = None
+    logger.remove()
+    logger.add(os.sys.stdout, level="INFO")
+
+    START_DATE = "2011-01-01"
+    END_DATE = "2021-01-01"
+    FILENAME = "sp500.csv"
+    LIMIT = None
+    # df = get_best_month_day(FILENAME, START_DATE, END_DATE, limit=LIMIT)
+
+    START_DATE = "2019-06-01"
+    END_DATE = "2021-05-01"
+
+    # df = get_best_hour(FILENAME, START_DATE, END_DATE, limit=LIMIT)
+
+    START_DATE = "2021-04-01"
+    END_DATE = "2021-05-01"
+    df = get_best_time(FILENAME, START_DATE, END_DATE, limit=LIMIT)
+    print(df)

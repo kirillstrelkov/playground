@@ -1,7 +1,12 @@
 import os
 
 import pandas as pd
-from stocks.buy_sell_analysis.common import Column, get_history, update_dataframe
+from stocks.buy_sell_analysis.common import (
+    Column,
+    get_history,
+    update_dataframe,
+    wrapper,
+)
 from utils.misc import concurrent_map
 
 
@@ -23,7 +28,7 @@ def _get_best_weekday_diffs(df_symbols):
 
 
 def get_best_weekday(filename, start_date, end_date, limit=None):
-    return __wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
+    return wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
@@ -34,7 +39,7 @@ def _get_monthly_diffs(df_symbols):
 
 
 def get_best_month(filename, start_date, end_date, limit=None):
-    return __wrapper(
+    return wrapper(
         filename, start_date, end_date, limit, _get_monthly_diffs, interval="1mo"
     )
 
@@ -47,25 +52,7 @@ def _get_month_day_diffs(df_symbols):
 
 
 def get_best_month_day(filename, start_date, end_date, limit=None):
-    return __wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
-
-
-def __wrapper(filename, start_date, end_date, limit, func, interval="1d"):
-    symbols = __get_symbols(filename, limit)
-
-    history_data = get_history(symbols.values.tolist(), start_date, end_date, interval)
-    symbols_with_history = [
-        {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
-        for symbol in history_data.columns.get_level_values(0).unique().to_list()
-    ]
-
-    symbols_dfs = pd.concat(concurrent_map(func, symbols_with_history))
-
-    symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
-
-    symbols_dfs = symbols_dfs.convert_dtypes()
-
-    return symbols_dfs
+    return wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
 
 
 def _get_hour_diffs(df_symbols):
@@ -87,7 +74,7 @@ def _get_hour_diffs(df_symbols):
 
 
 def get_best_hour(filename, start_date, end_date, limit=None):
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
@@ -120,7 +107,7 @@ def _get_quarter_diffs(df_symbols):
 
 def get_best_quarter(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
@@ -154,11 +141,37 @@ def _get_time_diffs(df_symbols):
 
 def get_best_time(filename, start_date, end_date, limit=None):
     # The requested range must be within the last 60 days.
-    return __wrapper(
+    return wrapper(
         filename,
         start_date,
         end_date,
         limit,
         _get_time_diffs,
         interval="15m",
+    )
+
+
+def _get_week_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol, True)
+
+    return df[
+        [
+            Column.YEAR,
+            Column.WEEK,
+            Column.SYMBOL,
+            Column.PERCENT,
+        ]
+    ]
+
+
+def get_best_week(filename, start_date, end_date, limit=None):
+    # The requested range must be within the last 60 days.
+    return wrapper(
+        filename,
+        start_date,
+        end_date,
+        limit,
+        _get_week_diffs,
+        interval="1wk",
     )

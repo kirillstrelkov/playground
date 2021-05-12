@@ -4,8 +4,11 @@ import pickle
 import tempfile
 
 import numpy as np
+import pandas as pd
 import yfinance as yf
+from loguru import logger
 from utils.file import read_content, save_file
+from utils.misc import concurrent_map
 
 
 class Column(object):
@@ -26,6 +29,20 @@ class Column(object):
     HISTORY = "history"
     TIME = "time"
     QUARTER = "quarter"
+    ALL = [
+        SYMBOL,
+        PERCENT,
+        OPEN,
+        YEAR,
+        MONTH,
+        MONTH_NAME,
+        WEEK,
+        WEEKDAY,
+        DAY,
+        DAY_NAME,
+        HOUR,
+        MINUTE,
+    ]
 
 
 def get_history(symbols, start_date, end_date, interval):
@@ -35,7 +52,11 @@ def get_history(symbols, start_date, end_date, interval):
     )
     hashsum = m.hexdigest()
 
-    path = os.path.join(tempfile.gettempdir(), hashsum)
+    folder = os.path.join(tempfile.gettempdir(), "stock_analysis")
+    os.makedirs(folder, exist_ok=True)
+
+    path = os.path.join(folder, hashsum)
+    logger.debug(f"Using history file: {path}")
 
     if not os.path.exists(path):
         df = yf.download(
@@ -55,8 +76,21 @@ def get_history(symbols, start_date, end_date, interval):
 def __get_date_column_name(df):
     if Column.DATETIME in df.columns:
         return Column.DATETIME
-    else:
+    elif Column.DATE in df.columns:
         return Column.DATE
+    else:
+        datetime_col = None
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                datetime_col = col
+                break
+
+        assert datetime_col is not None, f"Date columns not found in {df.columns}"
+
+        df[Column.DATETIME] = df[datetime_col]
+        df.drop(columns=[datetime_col], inplace=True)
+
+        return Column.DATETIME
 
 
 def update_dataframe(df, symbol, set_base_value=False):
@@ -79,7 +113,8 @@ def update_dataframe(df, symbol, set_base_value=False):
     df[Column.WEEK] = df_date.apply(lambda x: x.isocalendar()[1])
 
     # Filteting NA in Open - this means usually a dividends
-    df = df[df[Column.OPEN].notna()]
+    if not df.empty:
+        df = df[df[Column.OPEN].notna()]
 
     df[Column.SYMBOL] = symbol
     df[Column.PERCENT] = np.nan
@@ -90,3 +125,39 @@ def update_dataframe(df, symbol, set_base_value=False):
         df[Column.PERCENT] = df[Column.OPEN] / first_price
 
     return df
+
+
+def __get_symbols(filename, limit):
+    df = pd.read_csv(os.path.join(os.path.dirname(__file__), filename))
+    symbols = df[Column.SYMBOL]
+
+    if limit:
+        symbols = symbols[:limit]
+
+    return symbols
+
+
+def wrapper(filename, start_date, end_date, limit, func, interval="1d"):
+    symbols = __get_symbols(filename, limit).values.tolist()
+
+    history_data = get_history(symbols, start_date, end_date, interval)
+    symbols_with_history = [
+        {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
+        for symbol in history_data.columns.get_level_values(0).unique().to_list()
+        if not history_data.empty
+        and not history_data[history_data[symbol][Column.OPEN].notna()].empty
+    ]
+
+    dfs = [df for df in concurrent_map(func, symbols_with_history) if not df.empty]
+    if dfs:
+        symbols_dfs = pd.concat(dfs, ignore_index=True)
+
+        assert not symbols_dfs.isna().any().any()
+
+        symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
+
+        symbols_dfs = symbols_dfs.convert_dtypes()
+    else:
+        symbols_dfs = pd.DataFrame()
+
+    return symbols_dfs

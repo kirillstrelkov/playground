@@ -5,10 +5,11 @@ from stocks.buy_sell_analysis.analysis import (
     get_best_month_day,
     get_best_quarter,
     get_best_time,
+    get_best_week,
     get_best_weekday,
 )
 
-START_DATE = "2020-01-01"
+START_DATE = "2019-01-01"
 END_DATE = "2021-01-01"
 FILENAME = "sp500.csv"
 
@@ -43,7 +44,7 @@ def test_best_weekday():
 
 
 def test_best_hour():
-    df = get_best_hour(FILENAME, START_DATE, END_DATE, limit=5)
+    df = get_best_hour(FILENAME, "2021-04-01", "2021-05-01", limit=5)
     assert not df.empty
     assert (
         df[df[Column.HOUR] == 9][Column.PERCENT].mean()
@@ -70,4 +71,13 @@ def test_best_time_hour_and_minute():
     assert (
         df[df[Column.TIME] == 9.5][Column.PERCENT].mean()
         < df[df[Column.TIME] == 10.5][Column.PERCENT].mean()
+    )
+
+
+def test_best_week():
+    df = get_best_week(FILENAME, limit=5, start_date=START_DATE, end_date=END_DATE)
+    assert not df.empty
+    assert (
+        df[df[Column.WEEK] == 15][Column.PERCENT].mean()
+        < df[df[Column.WEEK] == 40][Column.PERCENT].mean()
     )

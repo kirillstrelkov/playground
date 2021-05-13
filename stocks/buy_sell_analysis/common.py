@@ -5,6 +5,7 @@ import tempfile
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 from loguru import logger
 from utils.file import read_content, save_file
@@ -25,6 +26,7 @@ class Column(object):
     DATE = "Date"
     DATETIME = "Datetime"
     SYMBOL = "Symbol"
+    ISIN = "ISIN"
     PERCENT = "Percent (mean)"
     HISTORY = "history"
     TIME = "time"
@@ -127,9 +129,39 @@ def update_dataframe(df, symbol, set_base_value=False):
     return df
 
 
+def __get_symbol(isin):
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={isin}&quotesCount=1&newsCount=0"
+    r = requests.get(url)
+    if r.status_code == 200:
+        quotes = r.json().get("quotes")
+        if quotes:
+            symbol = quotes[0].get("symbol")
+            if symbol:
+                return symbol
+
+    logger.debug(f"Symbol not found for {isin}")
+    return None
+
+
 def __get_symbols(filename, limit):
     df = pd.read_csv(os.path.join(os.path.dirname(__file__), filename))
-    symbols = df[Column.SYMBOL]
+    if Column.SYMBOL in df.columns:
+        symbols = df[Column.SYMBOL].values.tolist()
+    elif Column.ISIN in df.columns:
+        isins = df[Column.ISIN].tolist()
+
+        symbols = []
+        for isin in isins:
+            symbol = __get_symbol(isin)
+            if symbol:
+                symbols.append(symbol)
+
+            if len(symbols) >= limit:
+                break
+
+        assert symbols, f"Symbols not found {isins}"
+    else:
+        raise ValueError(f"{Column.SYMBOL} or {Column.ISIN} not found in {df.columns}")
 
     if limit:
         symbols = symbols[:limit]
@@ -138,7 +170,7 @@ def __get_symbols(filename, limit):
 
 
 def wrapper(filename, start_date, end_date, limit, func, interval="1d"):
-    symbols = __get_symbols(filename, limit).values.tolist()
+    symbols = __get_symbols(filename, limit)
 
     history_data = get_history(symbols, start_date, end_date, interval)
     symbols_with_history = [

@@ -1,6 +1,3 @@
-import os
-
-import pandas as pd
 from loguru import logger
 from pandas.core.frame import DataFrame
 from stocks.buy_sell_analysis.common import Column, update_dataframe, wrapper

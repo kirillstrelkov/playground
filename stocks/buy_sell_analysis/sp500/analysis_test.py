@@ -11,7 +11,7 @@ from stocks.buy_sell_analysis.analysis import (
 
 START_DATE = "2019-01-01"
 END_DATE = "2021-01-01"
-FILENAME = "sp500.csv"
+FILENAME = "sp500/sp500.csv"
 
 
 def test_best_month():

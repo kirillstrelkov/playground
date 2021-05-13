@@ -5,13 +5,13 @@ from stocks.buy_sell_analysis.analysis_base_first_date import (
     get_best_month_day,
     get_best_quarter,
     get_best_time,
-    get_best_weekday,
     get_best_week,
+    get_best_weekday,
 )
 
 START_DATE = "2019-01-01"
 END_DATE = "2021-01-01"
-FILENAME = "sp500.csv"
+FILENAME = "sp500/sp500.csv"
 LIMIT = 5
 
 

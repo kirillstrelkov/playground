@@ -264,13 +264,13 @@ def _get_start_and_end_dates(range_type: YahooRange):
         year = current_date.year
         end_date = datetime(year, 1, 1)
 
-        if range_type is YahooRange.YEARS_10:
+        if range_type == YahooRange.YEARS_10:
             year -= 10
-        elif range_type is YahooRange.YEARS_2:
+        elif range_type == YahooRange.YEARS_2:
             year -= 2
 
         start_date = datetime(year, 1, 1)
-    elif range_type is YahooRange.DAYS_58:
+    elif range_type == YahooRange.DAYS_58:
         end_date = current_date - timedelta(days=1)
         start_date = end_date - timedelta(days=58)
     else:

@@ -2,14 +2,24 @@ import hashlib
 import os
 import pickle
 import tempfile
+from datetime import datetime, timedelta
+from enum import Enum, auto
 
 import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
 from loguru import logger
+from matplotlib import pyplot
+from seaborn import barplot, boxplot, lineplot, scatterplot
 from utils.file import read_content, save_file
 from utils.misc import concurrent_map
+
+
+class YahooRange(Enum):
+    YEARS_10 = auto()
+    YEARS_2 = auto()
+    DAYS_58 = auto()
 
 
 class Column(object):
@@ -88,7 +98,7 @@ def get_history(symbols, start_date, end_date, interval):
     return df
 
 
-def __get_date_column_name(df):
+def get_date_column_name(df):
     if Column.DATETIME in df.columns:
         return Column.DATETIME
     elif Column.DATE in df.columns:
@@ -111,7 +121,7 @@ def __get_date_column_name(df):
 def update_dataframe(df, symbol, set_base_value=False):
     df = df.reset_index()
 
-    date_column = __get_date_column_name(df)
+    date_column = get_date_column_name(df)
     df_date = df[date_column]
     for component in [
         Column.YEAR,
@@ -187,7 +197,10 @@ def _get_symbols(filename, limit):
     return symbols
 
 
-def wrapper(filename, start_date, end_date, limit, func, interval="1d"):
+def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str = "1d"):
+    start_date, end_date = [
+        _format_datetime(d) for d in _get_start_and_end_dates(yahoo_range)
+    ]
     symbols = _get_symbols(filename, limit)
 
     history_data = get_history(symbols, start_date, end_date, interval)
@@ -211,3 +224,60 @@ def wrapper(filename, start_date, end_date, limit, func, interval="1d"):
         symbols_dfs = pd.DataFrame()
 
     return symbols_dfs
+
+
+def plot(**kwargs):
+    plot_ci = 95
+
+    funcs = [boxplot, barplot, scatterplot, lineplot]
+    # NOTE: after lineplot X will be float
+
+    data = kwargs["data"]
+    x = kwargs["x"]
+    y = kwargs["y"]
+    Y = data[y]
+    print(kwargs["data"][[x, y]].groupby(x).mean().head())
+
+    fig, axs = pyplot.subplots(nrows=len(funcs), figsize=(15, 20))
+
+    plot_kwargs = dict([(func, kwargs.pop(func.__name__, {})) for func in funcs])
+
+    for i, func in enumerate(funcs):
+        ax = axs[i]
+
+        if func == lineplot:
+            data[x] = data[x].astype(float)
+            kwargs["ci"] = plot_ci
+        elif func == barplot:
+            q_min, q_max = plot_kwargs.get(func).get("quantile", (0.50, 0.90))
+            ax.set_ylim(Y.quantile(q_min), Y.quantile(q_max))
+            kwargs["ci"] = plot_ci
+
+        ax = func(**kwargs, ax=ax)
+
+    fig.tight_layout()
+
+
+def _get_start_and_end_dates(range_type: YahooRange):
+    current_date = datetime.now()
+    if range_type in (YahooRange.YEARS_10, YahooRange.YEARS_2):
+        year = current_date.year
+        end_date = datetime(year, 1, 1)
+
+        if range_type is YahooRange.YEARS_10:
+            year -= 10
+        elif range_type is YahooRange.YEARS_2:
+            year -= 2
+
+        start_date = datetime(year, 1, 1)
+    elif range_type is YahooRange.DAYS_58:
+        end_date = current_date - timedelta(days=1)
+        start_date = end_date - timedelta(days=58)
+    else:
+        raise ValueError(f"Unsupported range: {range_type}")
+
+    return start_date, end_date
+
+
+def _format_datetime(time: datetime):
+    return datetime.strftime(time, "%Y-%m-%d")

@@ -1,6 +1,12 @@
 from loguru import logger
 from pandas.core.frame import DataFrame
-from stocks.buy_sell_analysis.common import Column, update_dataframe, wrapper
+from stocks.buy_sell_analysis.common import (
+    Column,
+    YahooRange,
+    get_date_column_name,
+    update_dataframe,
+    wrapper,
+)
 
 
 def _get_best_weekday_diffs(df_symbols):
@@ -42,8 +48,8 @@ def _get_best_weekday_diffs(df_symbols):
     ]
 
 
-def get_best_weekday(filename, start_date, end_date, limit=None):
-    return wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
+def get_best_weekday(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
@@ -71,10 +77,8 @@ def _get_monthly_diffs(df_symbols):
     return df_months[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
 
 
-def get_best_month(filename, start_date, end_date, limit=None):
-    return wrapper(
-        filename, start_date, end_date, limit, _get_monthly_diffs, interval="1mo"
-    )
+def get_best_month(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_monthly_diffs, interval="1mo")
 
 
 def _get_month_day_diffs(df_symbols):
@@ -107,8 +111,8 @@ def _get_month_day_diffs(df_symbols):
     ]
 
 
-def get_best_month_day(filename, start_date, end_date, limit=None):
-    return wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
+def get_best_month_day(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_month_day_diffs)
 
 
 def _get_hour_diffs(df_symbols):
@@ -153,11 +157,10 @@ def _get_hour_diffs(df_symbols):
     ]
 
 
-def get_best_hour(filename, start_date, end_date, limit=None):
+def get_best_hour(filename: str, yahoo_range: YahooRange, limit=None):
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_hour_diffs,
         interval="60m",
@@ -215,12 +218,11 @@ def _get_quarter_diffs(df_symbols):
     ]
 
 
-def get_best_quarter(filename, start_date, end_date, limit=None):
+def get_best_quarter(filename: str, yahoo_range: YahooRange, limit=None):
     # The requested range must be within the last 60 days.
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_quarter_diffs,
         interval="15m",
@@ -275,12 +277,11 @@ def _get_time_diffs(df_symbols):
     ]
 
 
-def get_best_time(filename, start_date, end_date, limit=None):
+def get_best_time(filename: str, yahoo_range: YahooRange, limit=None):
     # The requested range must be within the last 60 days.
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_time_diffs,
         interval="15m",
@@ -312,12 +313,55 @@ def _get_week_diffs(df_symbols):
     return df_months[[Column.YEAR, Column.WEEK, Column.SYMBOL, Column.PERCENT]]
 
 
-def get_best_week(filename, start_date, end_date, limit=None):
+def get_best_week(filename: str, yahoo_range: YahooRange, limit=None):
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_week_diffs,
         interval="1wk",
+    )
+
+
+def _get_year_day_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol)
+    date_column_name = get_date_column_name(df)
+
+    df_years = DataFrame(columns=df.columns)
+    for year in df[Column.YEAR].unique():
+        df_year = df[df[Column.YEAR] == year]
+        if df_year.shape[0] < 150:
+            logger.debug(f"Not enough data for {symbol} in {year}")
+            continue
+
+        first = df_year[date_column_name].min()
+        df_year[Column.PERCENT] = (
+            df_year[Column.OPEN]
+            / df_year[df_year[date_column_name] == first].iloc[0][Column.OPEN]
+        )
+        assert (
+            df_year.shape[0] > 150
+        ), f"Wrong data in dataframe {df_year.shape} for year {year}"
+
+        df_years = df_years.append(df_year)
+
+    return df_years[
+        [
+            date_column_name,
+            Column.YEAR,
+            Column.MONTH,
+            Column.SYMBOL,
+            Column.PERCENT,
+        ]
+    ]
+
+
+def get_best_year_day(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(
+        filename,
+        yahoo_range,
+        limit,
+        _get_year_day_diffs,
+        interval="1d",
     )

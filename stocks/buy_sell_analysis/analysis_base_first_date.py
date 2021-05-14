@@ -3,11 +3,10 @@ import os
 import pandas as pd
 from stocks.buy_sell_analysis.common import (
     Column,
-    get_history,
+    YahooRange,
     update_dataframe,
     wrapper,
 )
-from utils.misc import concurrent_map
 
 
 def __get_symbols(filename, limit):
@@ -27,8 +26,8 @@ def _get_best_weekday_diffs(df_symbols):
     return df[[Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.PERCENT]]
 
 
-def get_best_weekday(filename, start_date, end_date, limit=None):
-    return wrapper(filename, start_date, end_date, limit, _get_best_weekday_diffs)
+def get_best_weekday(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_best_weekday_diffs)
 
 
 def _get_monthly_diffs(df_symbols):
@@ -38,10 +37,8 @@ def _get_monthly_diffs(df_symbols):
     return df[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
 
 
-def get_best_month(filename, start_date, end_date, limit=None):
-    return wrapper(
-        filename, start_date, end_date, limit, _get_monthly_diffs, interval="1mo"
-    )
+def get_best_month(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_monthly_diffs, interval="1mo")
 
 
 def _get_month_day_diffs(df_symbols):
@@ -51,8 +48,8 @@ def _get_month_day_diffs(df_symbols):
     return df[[Column.YEAR, Column.MONTH, Column.DAY, Column.SYMBOL, Column.PERCENT]]
 
 
-def get_best_month_day(filename, start_date, end_date, limit=None):
-    return wrapper(filename, start_date, end_date, limit, _get_month_day_diffs)
+def get_best_month_day(filename: str, yahoo_range: YahooRange, limit=None):
+    return wrapper(filename, yahoo_range, limit, _get_month_day_diffs)
 
 
 def _get_hour_diffs(df_symbols):
@@ -73,11 +70,10 @@ def _get_hour_diffs(df_symbols):
     ]
 
 
-def get_best_hour(filename, start_date, end_date, limit=None):
+def get_best_hour(filename: str, yahoo_range: YahooRange, limit=None):
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_hour_diffs,
         interval="60m",
@@ -105,12 +101,11 @@ def _get_quarter_diffs(df_symbols):
     ]
 
 
-def get_best_quarter(filename, start_date, end_date, limit=None):
+def get_best_quarter(filename: str, yahoo_range: YahooRange, limit=None):
     # The requested range must be within the last 60 days.
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_quarter_diffs,
         interval="15m",
@@ -139,12 +134,11 @@ def _get_time_diffs(df_symbols):
     ]
 
 
-def get_best_time(filename, start_date, end_date, limit=None):
+def get_best_time(filename: str, yahoo_range: YahooRange, limit=None):
     # The requested range must be within the last 60 days.
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_time_diffs,
         interval="15m",
@@ -165,12 +159,11 @@ def _get_week_diffs(df_symbols):
     ]
 
 
-def get_best_week(filename, start_date, end_date, limit=None):
+def get_best_week(filename: str, yahoo_range: YahooRange, limit=None):
     # The requested range must be within the last 60 days.
     return wrapper(
         filename,
-        start_date,
-        end_date,
+        yahoo_range,
         limit,
         _get_week_diffs,
         interval="1wk",

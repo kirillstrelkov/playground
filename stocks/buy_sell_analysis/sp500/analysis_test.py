@@ -7,15 +7,16 @@ from stocks.buy_sell_analysis.analysis import (
     get_best_time,
     get_best_week,
     get_best_weekday,
+    get_best_year_day,
 )
+from stocks.buy_sell_analysis.common import YahooRange, get_date_column_name
 
-START_DATE = "2019-01-01"
-END_DATE = "2021-01-01"
 FILENAME = "sp500/sp500.csv"
+LIMIT = 5
 
 
 def test_best_month():
-    df = get_best_month(FILENAME, START_DATE, END_DATE, limit=5)
+    df = get_best_month(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     df2018 = df[df[Column.YEAR] == 2020]
     assert not df2018.empty
     assert (
@@ -25,7 +26,7 @@ def test_best_month():
 
 
 def test_best_month_day():
-    df = get_best_month_day(FILENAME, START_DATE, END_DATE, limit=5)
+    df = get_best_month_day(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     df_jan = df[df[Column.MONTH] == 7]
     assert not df_jan.empty
     assert (
@@ -35,7 +36,7 @@ def test_best_month_day():
 
 
 def test_best_weekday():
-    df = get_best_weekday(FILENAME, START_DATE, END_DATE, limit=5)
+    df = get_best_weekday(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.WEEKDAY] == 0][Column.PERCENT].mean()
@@ -44,7 +45,7 @@ def test_best_weekday():
 
 
 def test_best_hour():
-    df = get_best_hour(FILENAME, "2021-04-01", "2021-05-01", limit=5)
+    df = get_best_hour(FILENAME, YahooRange.DAYS_58, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.HOUR] == 9][Column.PERCENT].mean()
@@ -53,9 +54,7 @@ def test_best_hour():
 
 
 def test_best_15mins():
-    df = get_best_quarter(
-        FILENAME, limit=5, start_date="2021-04-01", end_date="2021-05-01"
-    )
+    df = get_best_quarter(FILENAME, YahooRange.DAYS_58, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.QUARTER] == 0][Column.PERCENT].mean()
@@ -64,9 +63,7 @@ def test_best_15mins():
 
 
 def test_best_time_hour_and_minute():
-    df = get_best_time(
-        FILENAME, limit=5, start_date="2021-04-01", end_date="2021-05-01"
-    )
+    df = get_best_time(FILENAME, YahooRange.DAYS_58, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.TIME] == 9.5][Column.PERCENT].mean()
@@ -75,9 +72,19 @@ def test_best_time_hour_and_minute():
 
 
 def test_best_week():
-    df = get_best_week(FILENAME, limit=5, start_date=START_DATE, end_date=END_DATE)
+    df = get_best_week(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.WEEK] == 15][Column.PERCENT].mean()
         < df[df[Column.WEEK] == 40][Column.PERCENT].mean()
+    )
+
+
+def test_year_day():
+    df = get_best_year_day(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
+    date_column_name = get_date_column_name(df)
+    assert not df.empty
+    assert (
+        df[df[date_column_name] == df[date_column_name].min()][Column.PERCENT].mean()
+        < df[df[date_column_name] == df[date_column_name].max()][Column.PERCENT].mean()
     )

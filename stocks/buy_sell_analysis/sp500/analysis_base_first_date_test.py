@@ -7,8 +7,9 @@ from stocks.buy_sell_analysis.analysis_base_first_date import (
     get_best_time,
     get_best_week,
     get_best_weekday,
+    get_best_year_day,
 )
-from stocks.buy_sell_analysis.common import YahooRange
+from stocks.buy_sell_analysis.common import YahooRange, get_date_column_name
 
 FILENAME = "sp500/sp500.csv"
 LIMIT = 5
@@ -63,6 +64,7 @@ def test_best_15mins():
         df[df[Column.QUARTER] == 15][Column.PERCENT].mean()
         < df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
     )
+    assert df[Column.QUARTER].unique() == [0, 15, 30, 45]
 
 
 def test_best_time_hour_and_minute():
@@ -72,6 +74,7 @@ def test_best_time_hour_and_minute():
         df[df[Column.TIME] == 10.0][Column.PERCENT].mean()
         < df[df[Column.TIME] == 12.75][Column.PERCENT].mean()
     )
+    assert df[Column.MINUTE].unique() == [0, 15, 30, 45]
 
 
 def test_best_week():
@@ -80,4 +83,14 @@ def test_best_week():
     assert (
         df[df[Column.WEEK] == 15][Column.PERCENT].mean()
         < df[df[Column.WEEK] == 40][Column.PERCENT].mean()
+    )
+
+
+def test_year_day():
+    df = get_best_year_day(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
+    date_column_name = get_date_column_name(df)
+    assert not df.empty
+    assert (
+        df[df[date_column_name] == df[date_column_name].min()][Column.PERCENT].mean()
+        < df[df[date_column_name] == df[date_column_name].max()][Column.PERCENT].mean()
     )

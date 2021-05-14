@@ -4,6 +4,7 @@ import pandas as pd
 from stocks.buy_sell_analysis.common import (
     Column,
     YahooRange,
+    get_date_column_name,
     update_dataframe,
     wrapper,
 )
@@ -167,4 +168,31 @@ def get_best_week(filename: str, yahoo_range: YahooRange, limit=None):
         limit,
         _get_week_diffs,
         interval="1wk",
+    )
+
+
+def _get_year_day_diffs(df_symbols):
+    symbol = df_symbols[Column.SYMBOL]
+    df = update_dataframe(df_symbols[Column.HISTORY], symbol, True)
+    date_column_name = get_date_column_name(df)
+
+    return df[
+        [
+            date_column_name,
+            Column.YEAR,
+            Column.MONTH,
+            Column.SYMBOL,
+            Column.PERCENT,
+        ]
+    ]
+
+
+def get_best_year_day(filename: str, yahoo_range: YahooRange, limit=None):
+    # The requested range must be within the last 60 days.
+    return wrapper(
+        filename,
+        yahoo_range,
+        limit,
+        _get_year_day_diffs,
+        interval="1d",
     )

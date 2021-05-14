@@ -60,6 +60,7 @@ def test_best_15mins():
         df[df[Column.QUARTER] == 0][Column.PERCENT].mean()
         < df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
     )
+    assert df[Column.QUARTER].unique() == [0, 15, 30, 45]
 
 
 def test_best_time_hour_and_minute():
@@ -69,6 +70,7 @@ def test_best_time_hour_and_minute():
         df[df[Column.TIME] == 9.5][Column.PERCENT].mean()
         < df[df[Column.TIME] == 10.5][Column.PERCENT].mean()
     )
+    assert df[Column.MINUTE].unique() == [0, 15, 30, 45]
 
 
 def test_best_week():

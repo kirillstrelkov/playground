@@ -17,6 +17,7 @@ from utils.misc import concurrent_map
 
 
 class YahooRange(IntEnum):
+    YEARS_20 = auto()
     YEARS_10 = auto()
     YEARS_2 = auto()
     DAYS_58 = auto()
@@ -260,7 +261,7 @@ def plot(**kwargs):
 
 def _get_start_and_end_dates(range_type: YahooRange):
     current_date = datetime.now()
-    if range_type in (YahooRange.YEARS_10, YahooRange.YEARS_2):
+    if range_type in (YahooRange.YEARS_10, YahooRange.YEARS_2, YahooRange.YEARS_20):
         year = current_date.year
         end_date = datetime(year, 1, 1)
 
@@ -268,6 +269,8 @@ def _get_start_and_end_dates(range_type: YahooRange):
             year -= 10
         elif range_type == YahooRange.YEARS_2:
             year -= 2
+        elif range_type == YahooRange.YEARS_20:
+            year -= 20
 
         start_date = datetime(year, 1, 1)
     elif range_type == YahooRange.DAYS_58:

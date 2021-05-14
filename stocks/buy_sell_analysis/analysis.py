@@ -19,7 +19,7 @@ def _get_best_weekday_diffs(df_symbols):
     df_weeks = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
-            df_week = df[(df[Column.YEAR] == year) & (df[Column.WEEK] == week)]
+            df_week = df[(df[Column.YEAR] == year) & (df[Column.WEEK] == week)].copy()
             if df_week.empty:
                 continue
 
@@ -58,7 +58,7 @@ def _get_monthly_diffs(df_symbols):
 
     df_months = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
-        df_month = df[df[Column.YEAR] == year]
+        df_month = df[df[Column.YEAR] == year].copy()
         if df_month.shape[0] < 12:
             logger.debug(f"Not enough data for {symbol} in {year}")
             continue
@@ -91,7 +91,9 @@ def _get_month_day_diffs(df_symbols):
     df_months = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
         for month in df[Column.MONTH].unique():
-            df_month = df[(df[Column.YEAR] == year) & (df[Column.MONTH] == month)]
+            df_month = df[
+                (df[Column.YEAR] == year) & (df[Column.MONTH] == month)
+            ].copy()
             if df_month.empty:
                 continue
             first_day = df_month[Column.DAY].min()
@@ -132,7 +134,7 @@ def _get_hour_diffs(df_symbols):
                     (df[Column.YEAR] == year)
                     & (df[Column.WEEK] == week)
                     & (df[Column.DAY] == day)
-                ]
+                ].copy()
                 if df_day.empty:
                     continue
                 first_hour = df_day[Column.HOUR].min()
@@ -186,7 +188,7 @@ def _get_quarter_diffs(df_symbols):
                         & (df[Column.WEEK] == week)
                         & (df[Column.DAY] == day)
                         & (df[Column.HOUR] == hour)
-                    ]
+                    ].copy()
                     if df_hour.empty:
                         continue
                     first_time = df_hour[Column.MINUTE].min()
@@ -203,6 +205,7 @@ def _get_quarter_diffs(df_symbols):
                     else:
                         logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
+    df_days = df_days[df_days[Column.MINUTE].isin(range(0, 60, 15))]
     df_days[Column.QUARTER] = df_days[Column.MINUTE]
     return df_days[
         [
@@ -248,7 +251,7 @@ def _get_time_diffs(df_symbols):
                     (df[Column.YEAR] == year)
                     & (df[Column.WEEK] == week)
                     & (df[Column.DAY] == day)
-                ]
+                ].copy()
                 if df_hour.empty:
                     continue
                 first_time = df_hour[Column.TIME].min()
@@ -262,6 +265,8 @@ def _get_time_diffs(df_symbols):
                     df_days = df_days.append(df_hour)
                 else:
                     logger.debug(f"Not enough data for {symbol} in {week} {day}")
+
+    df_days = df_days[df_days[Column.MINUTE].isin(range(0, 60, 15))]
 
     return df_days[
         [
@@ -294,7 +299,7 @@ def _get_week_diffs(df_symbols):
 
     df_months = DataFrame(columns=Column.ALL)
     for year in df[Column.YEAR].unique():
-        df_month = df[df[Column.YEAR] == year]
+        df_month = df[df[Column.YEAR] == year].copy()
         if df_month.shape[0] < 50:
             logger.debug(f"Not enough data for {symbol} in {year}")
             continue
@@ -330,7 +335,7 @@ def _get_year_day_diffs(df_symbols):
 
     df_years = DataFrame(columns=df.columns)
     for year in df[Column.YEAR].unique():
-        df_year = df[df[Column.YEAR] == year]
+        df_year = df[df[Column.YEAR] == year].copy()
         if df_year.shape[0] < 150:
             logger.debug(f"Not enough data for {symbol} in {year}")
             continue

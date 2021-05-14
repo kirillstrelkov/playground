@@ -87,6 +87,7 @@ def _get_quarter_diffs(df_symbols):
 
     df = update_dataframe(df_history, symbol, True)
 
+    df = df[df[Column.MINUTE].isin(range(0, 60, 15))]
     df[Column.QUARTER] = df[Column.MINUTE]
     return df[
         [
@@ -119,6 +120,7 @@ def _get_time_diffs(df_symbols):
 
     df = update_dataframe(df_history, symbol, True)
 
+    df = df[df[Column.MINUTE].isin(range(0, 60, 15))]
     df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
     return df[

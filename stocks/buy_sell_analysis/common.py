@@ -47,30 +47,43 @@ class Column(object):
     ]
 
 
-def get_history(symbols, start_date, end_date, interval):
+TEMP_FOLDER = os.path.join(tempfile.gettempdir(), "stock_analysis")
+
+
+def __get_hashsum(*args):
     m = hashlib.sha256()
-    m.update(
-        ",".join((",".join(symbols), start_date, end_date, interval)).encode("utf-8")
-    )
+    m.update(",".join([str(a) for a in args]).encode("utf-8"))
     hashsum = m.hexdigest()
+    return hashsum
 
-    folder = os.path.join(tempfile.gettempdir(), "stock_analysis")
-    os.makedirs(folder, exist_ok=True)
 
-    path = os.path.join(folder, hashsum)
+def __get_cached_value(hashsum, func_get_value):
+    os.makedirs(TEMP_FOLDER, exist_ok=True)
+
+    path = os.path.join(TEMP_FOLDER, hashsum)
     logger.debug(f"Using history file: {path}")
 
     if not os.path.exists(path):
-        df = yf.download(
+        data = func_get_value()
+        save_file(path, pickle.dumps(data), mode="wb", encoding=None)
+
+    data = pickle.loads(read_content(path, mode="rb", encoding=None))
+    return data
+
+
+def get_history(symbols, start_date, end_date, interval):
+    hashsum = __get_hashsum(",".join(symbols), start_date, end_date, interval)
+
+    df = __get_cached_value(
+        hashsum,
+        lambda: yf.download(
             symbols,
             interval=interval,
             start=start_date,
             end=end_date,
             group_by="ticker",
-        )
-        save_file(path, pickle.dumps(df), mode="wb", encoding=None)
-
-    df = pickle.loads(read_content(path, mode="rb", encoding=None))
+        ),
+    )
 
     return df
 
@@ -150,14 +163,19 @@ def __get_symbols(filename, limit):
     elif Column.ISIN in df.columns:
         isins = df[Column.ISIN].tolist()
 
-        symbols = []
-        for isin in isins:
-            symbol = __get_symbol(isin)
-            if symbol:
-                symbols.append(symbol)
+        def __get_symbols_from_yf():
+            symbols = []
+            for isin in isins:
+                symbol = __get_symbol(isin)
+                if symbol:
+                    symbols.append(symbol)
 
-            if limit and len(symbols) >= limit:
-                break
+                if limit and len(symbols) >= limit:
+                    break
+            return symbols
+
+        hashsum = __get_hashsum(*(isins + [str(limit)]))
+        symbols = __get_cached_value(hashsum, __get_symbols_from_yf)
 
         assert symbols, f"Symbols not found {isins}"
     else:

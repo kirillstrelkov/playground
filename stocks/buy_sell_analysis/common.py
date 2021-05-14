@@ -156,7 +156,7 @@ def __get_symbols(filename, limit):
             if symbol:
                 symbols.append(symbol)
 
-            if len(symbols) >= limit:
+            if limit and len(symbols) >= limit:
                 break
 
         assert symbols, f"Symbols not found {isins}"

@@ -1,8 +1,12 @@
 import os
 
 import pandas as pd
-from stocks.buy_sell_analysis.common import (Column, get_history,
-                                             update_dataframe, wrapper)
+from stocks.buy_sell_analysis.common import (
+    Column,
+    get_history,
+    update_dataframe,
+    wrapper,
+)
 from utils.misc import concurrent_map
 
 
@@ -171,14 +175,3 @@ def get_best_week(filename, start_date, end_date, limit=None):
         _get_week_diffs,
         interval="1wk",
     )
-
-
-if __name__ == "__main__":
-    START_DATE = "2011-01-01"
-    END_DATE = "2021-01-01"
-    FILENAME = "dax/dax_mdax_sdax.csv"
-    LIMIT = None
-
-    df = get_best_month_day(FILENAME, START_DATE, END_DATE, limit=LIMIT)
-
-    df

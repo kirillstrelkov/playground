@@ -156,7 +156,7 @@ def __get_symbol(isin):
     return None
 
 
-def __get_symbols(filename, limit):
+def _get_symbols(filename, limit):
     df = pd.read_csv(os.path.join(os.path.dirname(__file__), filename))
     if Column.SYMBOL in df.columns:
         symbols = df[Column.SYMBOL].values.tolist()
@@ -188,7 +188,7 @@ def __get_symbols(filename, limit):
 
 
 def wrapper(filename, start_date, end_date, limit, func, interval="1d"):
-    symbols = __get_symbols(filename, limit)
+    symbols = _get_symbols(filename, limit)
 
     history_data = get_history(symbols, start_date, end_date, interval)
     symbols_with_history = [

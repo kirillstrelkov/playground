@@ -3,7 +3,7 @@ import os
 import pickle
 import tempfile
 from datetime import datetime, timedelta
-from enum import Enum, auto
+from enum import IntEnum, auto
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ from utils.file import read_content, save_file
 from utils.misc import concurrent_map
 
 
-class YahooRange(Enum):
+class YahooRange(IntEnum):
     YEARS_10 = auto()
     YEARS_2 = auto()
     DAYS_58 = auto()

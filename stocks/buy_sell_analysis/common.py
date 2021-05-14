@@ -241,8 +241,6 @@ def plot(**kwargs):
 
     fig, axs = pyplot.subplots(nrows=len(funcs), figsize=(15, 20))
 
-    plot_kwargs = dict([(func, kwargs.pop(func.__name__, {})) for func in funcs])
-
     for i, func in enumerate(funcs):
         ax = axs[i]
 
@@ -250,11 +248,9 @@ def plot(**kwargs):
             data[x] = data[x].astype(float)
             kwargs["ci"] = plot_ci
         elif func == barplot:
-            q_min, q_max = plot_kwargs.get(func).get("quantile", (0.50, 0.90))
-            ax.set_ylim(Y.quantile(q_min), Y.quantile(q_max))
             kwargs["ci"] = plot_ci
 
-        ax = func(**kwargs, ax=ax)
+        func(**kwargs, ax=ax)
 
     fig.tight_layout()
 

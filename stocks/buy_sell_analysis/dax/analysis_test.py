@@ -69,7 +69,7 @@ def test_best_time_hour_and_minute():
         df[df[Column.TIME] == 15.0][Column.PERCENT].mean()
         < df[df[Column.TIME] == 13.0][Column.PERCENT].mean()
     )
-    assert df[Column.MINUTE].unique() == [0, 15, 30, 45]
+    assert df[Column.MINUTE].unique() == [0, 30]
 
 
 def test_best_week():

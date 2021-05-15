@@ -68,17 +68,17 @@ def test_best_15mins():
 
 
 def test_best_time_hour_and_minute():
-    df = get_best_time(FILENAME, YahooRange.DAYS_58, limit=5)
+    df = get_best_time(FILENAME, YahooRange.DAYS_58, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.TIME] == 10.0][Column.PERCENT].mean()
-        < df[df[Column.TIME] == 12.75][Column.PERCENT].mean()
+        < df[df[Column.TIME] == 13.0][Column.PERCENT].mean()
     )
-    assert df[Column.MINUTE].unique() == [0, 15, 30, 45]
+    assert df[Column.MINUTE].unique() == [0, 30]
 
 
 def test_best_week():
-    df = get_best_week(FILENAME, YahooRange.YEARS_2, limit=5)
+    df = get_best_week(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     assert not df.empty
     assert (
         df[df[Column.WEEK] == 15][Column.PERCENT].mean()

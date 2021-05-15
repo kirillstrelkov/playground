@@ -239,7 +239,7 @@ def _get_time_diffs(df_symbols):
     df = update_dataframe(df_history, symbol)
 
     minutes = df[Column.MINUTE].unique()
-    assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes}"
+    assert minutes.shape[0] > 1, f"Wrong data for {symbol} {minutes}"
 
     df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
@@ -261,12 +261,12 @@ def _get_time_diffs(df_symbols):
                 )
                 if (
                     df_hour.shape[0] >= 2
-                ):  # good data is at least 2 times per hour (9:30, 9:45)
+                ):  # good data is at least 2 times per hour (9:00, 9:30)
                     df_days = df_days.append(df_hour)
                 else:
                     logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
-    df_days = df_days[df_days[Column.MINUTE].isin(range(0, 60, 15))]
+    df_days = df_days[df_days[Column.MINUTE].isin([0, 30])]
 
     return df_days[
         [
@@ -289,7 +289,7 @@ def get_best_time(filename: str, yahoo_range: YahooRange, limit=None):
         yahoo_range,
         limit,
         _get_time_diffs,
-        interval="15m",
+        interval="30m",
     )
 
 

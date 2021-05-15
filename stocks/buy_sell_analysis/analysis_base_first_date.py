@@ -120,7 +120,7 @@ def _get_time_diffs(df_symbols):
 
     df = update_dataframe(df_history, symbol, True)
 
-    df = df[df[Column.MINUTE].isin(range(0, 60, 15))]
+    df = df[df[Column.MINUTE].isin([0, 30])]
     df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
     return df[
@@ -144,7 +144,7 @@ def get_best_time(filename: str, yahoo_range: YahooRange, limit=None):
         yahoo_range,
         limit,
         _get_time_diffs,
-        interval="15m",
+        interval="30m",
     )
 
 

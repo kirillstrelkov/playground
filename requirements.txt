@@ -25,3 +25,7 @@ yfinance
 loguru
 tabulate
 pycln
+snakeviz
+pandoc
+nbconvert
+chart_studio

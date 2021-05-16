@@ -61,14 +61,14 @@ class Column(object):
 TEMP_FOLDER = os.path.join(tempfile.gettempdir(), "stock_analysis")
 
 
-def __get_hashsum(*args):
+def _get_hashsum(*args):
     m = hashlib.sha256()
     m.update(",".join([str(a) for a in args]).encode("utf-8"))
     hashsum = m.hexdigest()
     return hashsum
 
 
-def __get_cached_value(hashsum, func_get_value):
+def _get_cached_value(hashsum, func_get_value):
     os.makedirs(TEMP_FOLDER, exist_ok=True)
 
     path = os.path.join(TEMP_FOLDER, hashsum)
@@ -83,9 +83,9 @@ def __get_cached_value(hashsum, func_get_value):
 
 
 def get_history(symbols, start_date, end_date, interval):
-    hashsum = __get_hashsum(",".join(symbols), start_date, end_date, interval)
+    hashsum = _get_hashsum(",".join(symbols), start_date, end_date, interval)
 
-    df = __get_cached_value(
+    df = _get_cached_value(
         hashsum,
         lambda: yf.download(
             symbols,
@@ -185,8 +185,8 @@ def _get_symbols(filename, limit):
                     break
             return symbols
 
-        hashsum = __get_hashsum(*(isins + [str(limit)]))
-        symbols = __get_cached_value(hashsum, __get_symbols_from_yf)
+        hashsum = _get_hashsum(*(isins + [str(limit)]))
+        symbols = _get_cached_value(hashsum, __get_symbols_from_yf)
 
         assert symbols, f"Symbols not found {isins}"
     else:
@@ -199,30 +199,43 @@ def _get_symbols(filename, limit):
 
 
 def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str = "1d"):
-    start_date, end_date = [
-        _format_datetime(d) for d in _get_start_and_end_dates(yahoo_range)
-    ]
-    symbols = _get_symbols(filename, limit)
+    def __get_symbols_nested():
+        start_date, end_date = [
+            _format_datetime(d) for d in _get_start_and_end_dates(yahoo_range)
+        ]
+        symbols = _get_symbols(filename, limit)
 
-    history_data = get_history(symbols, start_date, end_date, interval)
-    symbols_with_history = [
-        {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
-        for symbol in history_data.columns.get_level_values(0).unique().to_list()
-        if not history_data.empty
-        and not history_data[history_data[symbol][Column.OPEN].notna()].empty
-    ]
+        history_data = get_history(symbols, start_date, end_date, interval)
+        symbols_with_history = [
+            {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
+            for symbol in history_data.columns.get_level_values(0).unique().to_list()
+            if not history_data.empty
+            and not history_data[history_data[symbol][Column.OPEN].notna()].empty
+        ]
 
-    dfs = [df for df in concurrent_map(func, symbols_with_history) if not df.empty]
-    if dfs:
-        symbols_dfs = pd.concat(dfs, ignore_index=True)
+        dfs = [df for df in concurrent_map(func, symbols_with_history) if not df.empty]
+        if dfs:
+            symbols_dfs = pd.concat(dfs, ignore_index=True)
 
-        assert not symbols_dfs.isna().any().any()
+            assert not symbols_dfs.isna().any().any()
 
-        symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
+            symbols_dfs[Column.PERCENT] = symbols_dfs[Column.PERCENT] * 100
 
-        symbols_dfs = symbols_dfs.convert_dtypes()
-    else:
-        symbols_dfs = pd.DataFrame()
+            symbols_dfs = symbols_dfs.convert_dtypes()
+        else:
+            symbols_dfs = pd.DataFrame()
+        return symbols_dfs
+
+    symbols_dfs = _get_cached_value(
+        _get_hashsum(
+            filename,
+            yahoo_range,
+            limit,
+            func.__name__,
+            interval,
+        ),
+        __get_symbols_nested,
+    )
 
     return symbols_dfs
 
@@ -250,7 +263,10 @@ def plot(**kwargs):
         elif func == barplot:
             kwargs["ci"] = plot_ci
 
-        func(**kwargs, ax=ax)
+        ax = func(**kwargs, ax=ax)
+        if func == barplot:
+            y_mean = Y.mean()
+            ax.set_xlim(y_mean * 0.5, y_mean * 1.2)
 
     fig.tight_layout()
 

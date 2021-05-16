@@ -39,7 +39,7 @@ def test_best_weekday():
     df = get_best_weekday(FILENAME, YahooRange.YEARS_2, limit=LIMIT)
     assert not df.empty
     assert (
-        df[df[Column.WEEKDAY] == 0][Column.PERCENT].mean()
+        df[df[Column.WEEKDAY] == 3][Column.PERCENT].mean()
         < df[df[Column.WEEKDAY] == 4][Column.PERCENT].mean()
     )
 
@@ -57,7 +57,7 @@ def test_best_15mins():
     df = get_best_quarter(FILENAME, YahooRange.DAYS_58, limit=LIMIT)
     assert not df.empty
     assert (
-        df[df[Column.QUARTER] == 0][Column.PERCENT].mean()
+        df[df[Column.QUARTER] == 15][Column.PERCENT].mean()
         < df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
     )
     assert df[Column.QUARTER].unique() == [0, 15, 30, 45]

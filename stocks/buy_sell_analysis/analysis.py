@@ -310,7 +310,7 @@ def _get_week_diffs(df_symbols):
             / df_month[df_month[Column.WEEK] == first].iloc[0][Column.OPEN]
         )
         assert (
-            df_month.shape[0] > 50
+            df_month.shape[0] >= 50
         ), f"Wrong number of month in dataframe {df_month.shape} for year {year}"
 
         df_months = df_months.append(df_month)

@@ -83,7 +83,9 @@ def _get_cached_value(hashsum, func_get_value):
 
 
 def get_history(symbols, start_date, end_date, interval):
-    hashsum = _get_hashsum(",".join(symbols), start_date, end_date, interval)
+    hashsum = _get_hashsum(
+        get_history.__name__, ",".join(symbols), start_date, end_date, interval
+    )
 
     df = _get_cached_value(
         hashsum,
@@ -185,7 +187,7 @@ def _get_symbols(filename, limit):
                     break
             return symbols
 
-        hashsum = _get_hashsum(*(isins + [str(limit)]))
+        hashsum = _get_hashsum(_get_symbols.__name__, *(isins + [str(limit)]))
         symbols = _get_cached_value(hashsum, __get_symbols_from_yf)
 
         assert symbols, f"Symbols not found {isins}"
@@ -228,10 +230,12 @@ def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str =
 
     symbols_dfs = _get_cached_value(
         _get_hashsum(
+            wrapper.__name__,
+            func.__module__,
+            func.__name__,
             filename,
             yahoo_range,
             limit,
-            func.__name__,
             interval,
         ),
         __get_symbols_nested,
@@ -266,7 +270,7 @@ def plot(**kwargs):
         ax = func(**kwargs, ax=ax)
         if func == barplot:
             y_mean = Y.mean()
-            ax.set_xlim(y_mean * 0.5, y_mean * 1.2)
+            ax.set_ylim(y_mean * 0.8, y_mean * 1.2)
 
     fig.tight_layout()
 

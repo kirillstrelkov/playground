@@ -1,4 +1,4 @@
-import os
+import calendar
 import sys
 
 from loguru import logger
@@ -30,8 +30,9 @@ def __get_data(filename, analysis_module, limit):
 
     data = []
     for column, func, yrange in data_to_collect:
-        # TODO: fix add modulename
-        hashsum = _get_hashsum(module_name, func.__name__, filename, yrange, limit)
+        hashsum = _get_hashsum(
+            __get_data.__name__, module_name, func.__name__, filename, yrange, limit
+        )
         logger.info(f"{column}, {func.__name__}, {yrange} hashum: {hashsum}")
         data.append(
             (
@@ -45,6 +46,19 @@ def __get_data(filename, analysis_module, limit):
 
     data = [(k, df[[k, Column.PERCENT]].groupby(k).mean()) for k, df in data]
     return dict(data)
+
+
+def __format_value(key, value):
+    if key == Column.MONTH:
+        value = calendar.month_name[value]
+    elif key == Column.WEEKDAY:
+        value = calendar.day_name[value]
+    elif key == Column.TIME:
+        hours = int(value)
+        minutes = int((value - hours) * 60)
+        value = f"{hours:02}:{minutes:02}"
+
+    return value
 
 
 def __get_stats(*data, module_name=None, filename=None):
@@ -68,6 +82,7 @@ def __get_stats(*data, module_name=None, filename=None):
                 else:
                     # key is in index not in column!
                     point = row.name
+
                     if cur_value < prev_value:
                         df_point_go_down.add(point)
                     elif cur_value > prev_value:
@@ -80,18 +95,31 @@ def __get_stats(*data, module_name=None, filename=None):
 
         stats.append(
             {
-                "filename": os.path.basename(filename) if filename else None,
-                "module": module_name.split(".")[-1] if module_name else None,
+                # "filename": os.path.basename(filename) if filename else None,
+                # "module": module_name.split(".")[-1] if module_name else None,
                 "type": key,
-                "down": set.intersection(*points_go_down) or None,
-                "up": set.intersection(*points_go_up) or None,
+                "down": [
+                    __format_value(key, v)
+                    for v in sorted(set.intersection(*points_go_down))
+                ]
+                or None,
+                "up": [
+                    __format_value(key, v)
+                    for v in sorted(set.intersection(*points_go_up))
+                ]
+                or None,
             }
         )
     return stats
 
 
 def print_stats(stats):
-    print(DataFrame(stats).to_markdown())
+    df = DataFrame(stats)
+    func_to_str = lambda x: ", ".join([str(v) for v in x]) if x else None
+    df["up"] = df["up"].apply(func_to_str)
+    df["down"] = df["down"].apply(func_to_str)
+    print(df.to_markdown())
+    print()
 
 
 if __name__ == "__main__":
@@ -104,11 +132,14 @@ if __name__ == "__main__":
             d = __get_data(filename, analysis_module, limit)
             data_per_file.append(d)
 
+            print(f"Module {analysis_module.__name__}, file {filename}")
+            print_stats(__get_stats(d))
+
         print(f"File: {filename} combined:")
         stats_per_file = __get_stats(*data_per_file, filename=filename)
         print_stats(stats_per_file)
         data += data_per_file
 
     stats = __get_stats(*data)
-    print("Combined:")
+    print("All combined:")
     print_stats(stats)

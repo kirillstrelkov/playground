@@ -4,35 +4,57 @@ from pprint import pprint
 
 import pandas as pd
 
-if __name__ == "__main__":
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+
+def get_summary(folder):
     files = sorted(
         [
-            os.path.join(data_dir, p)
-            for p in os.listdir(data_dir)
-            if os.path.isfile(os.path.join(data_dir, p))
+            os.path.join(folder, p)
+            for p in os.listdir(folder)
+            if os.path.isfile(os.path.join(folder, p))
         ]
     )
-    # files = files[-2:]
-    pprint(files)
-    data = defaultdict(int)
+
     dframes = []
     for f in files:
-        print(f)
         df = pd.read_excel(io=f, sheet_name="Uued sõidukid", skiprows=3)
         df = df[df.Kategooria.apply(lambda x: "M1" in str(x))]
-        # df = df[(df.Kategooria == 'M1') & (df['Mootori tüüp'] == 'Diisel')]
-        # df = df[(df.Kategooria == 'M1') & (df['Mootori tüüp'] == 'Bensiin hübriid')]
-        # df = df[(df.Kategooria == 'M1') & ('Diisel hübriid' == df['Mootori tüüp'])]
-        # df = df[(df.Mark == 'Lamborghini')]
 
         dframes.append(df)
-        for _, d in df.iterrows():
-            name = " ".join([d["Mark"], d["Mudel"], str(round(d["Mootori võimsus"]))])
-            data[name] += d["Arv"]
 
-    pd.concat(dframes).to_csv("mnt.csv")
-    data = sorted(data.items(), key=lambda x: x[1])
-    pprint(data)
+    df = pd.concat(dframes)
+    for col in [
+        "Mark",
+        "Mudel",
+    ]:
+        df[col] = df[col].astype(str)
 
-    # TODO; find how much car each model gets sold by fuel type
+    df = df.convert_dtypes()
+    return df
+
+
+def get_model_stats(df):
+    return (
+        df[
+            [
+                "Mark",
+                "Mudel",
+                "Mootori võimsus",
+                "Arv",
+            ]
+        ]
+        .groupby(
+            [
+                "Mark",
+                "Mudel",
+                "Mootori võimsus",
+            ]
+        )
+        .sum()
+    )
+
+
+if __name__ == "__main__":
+    data_dir = os.path.join(os.path.dirname(__file__), "data/2020")
+    df = get_summary(data_dir)
+    # stats = get_model_stats(df).sort_values("Arv", ascending=False)
+    # print(stats.head(20))

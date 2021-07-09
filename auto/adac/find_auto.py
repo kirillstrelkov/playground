@@ -4,11 +4,12 @@ import os
 import re
 from datetime import datetime
 from hashlib import md5
-from itertools import chain
+from time import sleep
 
 import numpy as np
 import pandas as pd
 from common_utils import browser_decorator
+from easelenium.browser import Browser
 from loguru import logger
 from selenium.webdriver.common.by import By
 from tqdm import tqdm
@@ -44,142 +45,127 @@ def chunks(lst, n):
         yield lst[i : i + n]
 
 
+def fix_german_number(text):
+    return text.replace(".", "").replace(",", ".")
+
+
 def get_number(text):
     return int(re.findall(r"\d+", str(text))[0])
 
 
-def _get_adac_model_urls(browser, url):
-    browser.get(url)
-    return [
-        browser.get_attribute(e, "href")
-        for e in browser.find_elements(CSS_MODEL_trim_level)
-    ]
-
-
 def _get_m_url(data):
-    return get_models_urls(data["price"], min_price=data.get("min_price"))
+    return get_model_urls(data["price"], min_price=data.get("min_price"))
 
 
-@browser_decorator
-def __get_trim_level_urls(url, browser=None):
-    trim_level_urls = []
-    browser.get(url)
-    if browser.is_visible(CSS_ID_LOAD_ALL):
-        browser.click(CSS_ID_LOAD_ALL)
-        browser.wait_for_not_visible(ID_OVERLAY)
-
-    trim_level_urls += [
-        browser.get_attribute(e, "href")
-        for e in browser.find_elements(CSS_MODEL_trim_level)
-    ]
-
-    return trim_level_urls
-
-
-def _get_trim_level_urls(price):
-    model_urls = _get_model_urls(price)
-    trim_level_urls = concurrent_map(__get_trim_level_urls, model_urls)
-    return flatten(trim_level_urls)
-
-
-@browser_decorator
-def _get_model_urls(price, browser=None):
-    model_urls = []
-
-    browser.get(
-        "https://www.adac.de/infotestrat/autodatenbank/"
-        "wunschauto/default.aspx?ComponentId=199515&SourcePageId=287152"
-    )
-
-    __accept_cookies(browser)
-
-    browser.click(ID_PRICE_BOX_MAX)
-    browser.type(ID_PRICE_BOX_MAX_INPUT, str(price))
-
-    browser.click(A_AKTUAL)
-    browser.wait_for_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-    browser.wait_for_not_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-
-    total_count = get_number(browser.get_text(CSS_TOTAL_COUNT))
-    current_count = len(browser.find_elements(CSS_CAR_MODEL))
-    while total_count != current_count:
-        browser.wait_for_not_visible(ID_OVERLAY, timeout=TIMEOUT_WAIT_FOR)
-        if browser.is_visible(CSS_LOAD_MORE):
-            browser.click(CSS_LOAD_MORE)
-        browser.wait_for_not_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-        current_count = len(browser.find_elements(CSS_CAR_MODEL))
-
-    model_urls = [
-        browser.get_attribute(e, "href") for e in browser.find_elements(CSS_CAR_MODEL)
-    ]
-
-    return model_urls
-
-
-@browser_decorator
-def get_models_urls(
-    price, min_price=None, min_kw=None, fuel=None, mark=None, browser=None
+def __get_url_with_queries(
+    browser: Browser,
+    price: int,
+    min_price=1000,
+    min_kw=None,
+    mark=None,
+    new_cars_only=True,
 ):
-    url = "https://www.adac.de/infotestrat/autodatenbank/wunschauto/default.aspx?ComponentId=199515&SourcePageId=287152"
+    url = "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/autosuche/"
+    if new_cars_only:
+        url += "?newCarsOnly=true"
 
     browser.get(url)
-    log_postfix = f" with price: {min_price} - {price}"
-    logger.debug(f"Processing {url}" + log_postfix)
 
     __accept_cookies(browser)
 
-    browser.click(ID_PRICE_BOX_MAX)
-    browser.type(ID_PRICE_BOX_MAX_INPUT, str(price))
+    # add price to url
 
-    if min_price:
-        browser.click(ID_PRICE_BOX_MIN)
-        browser.type(ID_PRICE_BOX_MIN_INPUT, str(min_price))
-
-    if fuel:
-        browser.click((By.CSS_SELECTOR, "[id*=labelMotorart]"))
-        browser.click((By.XPATH, '//label[text()="{}"]'.format(fuel)))
+    min_supported_price = int(
+        fix_german_number(
+            browser.get_value(
+                by_xpath="//*[@id='basePrice']/../..//*[@for='basePrice']",
+                visible=False,
+            )
+        )
+    )
+    max_supported_price = int(
+        fix_german_number(
+            browser.get_value(
+                by_xpath="//*[@id='basePrice']/../..//*[@for='basePrice-secondary']",
+                visible=False,
+            )
+        )
+    )
+    assert min_supported_price <= min_price
+    assert max_supported_price >= price
+    url += f"&basePrice.min={min_price}&basePrice.max={price}"
 
     if min_kw:
-        parent = browser.get_parent(ID_SLIDER_POWER_MIN)
-        browser.click(parent)
-        browser.type(browser.find_descendant(parent, CSS_INPUT), str(min_kw))
+        # add kW to url
+        min_supported_kw = int(
+            fix_german_number(
+                browser.get_value(
+                    by_xpath="//*[@id='powerInKW']/../..//*[@for='powerInKW']",
+                    visible=False,
+                )
+            )
+        )
+        max_supported_kw = int(
+            fix_german_number(
+                browser.get_value(
+                    by_xpath="//*[@id='powerInKW']/../..//*[@for='powerInKW-secondary']",
+                    visible=False,
+                )
+            )
+        )
+        assert min_supported_kw <= min_kw <= max_supported_kw
+        url += f"&powerInKW.min={min_kw}&powerInKW.max={max_supported_kw}"
 
+    # add mark to url
+    browser.get(url)
     if mark:
-        browser.select_option_by_value_from_dropdown(CSS_ID_MARK, mark)
-        browser.wait_for_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-        browser.wait_for_not_visible(ID_OVERLAY, timeout=TIMEOUT_WAIT_FOR)
+        browser.type(by_id="brand-input", text=mark)
+        browser.click(by_css="#brand-suggestions > li")
+        btn_search = "//main//button[contains(text(), 'anzeigen')]"
+        browser.click(by_xpath=btn_search)
+        browser.wait_for_visible(by_xpath=btn_search)
 
-    browser.click(A_AKTUAL)
-    browser.wait_for_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-    browser.wait_for_not_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
+    return browser.get_current_url()
 
-    total_count = get_number(browser.get_text(CSS_TOTAL_COUNT))
-    current_count = len(browser.find_elements(CSS_CAR_MODEL))
-    while total_count != current_count:
-        browser.wait_for_not_visible(ID_OVERLAY, timeout=TIMEOUT_WAIT_FOR)
-        if browser.is_visible(CSS_LOAD_MORE):
-            browser.click(CSS_LOAD_MORE)
-        browser.wait_for_not_visible(ID_LOADING_IMAGE, timeout=TIMEOUT_WAIT_FOR)
-        current_count = len(browser.find_elements(CSS_CAR_MODEL))
+
+@browser_decorator
+def get_model_urls(
+    price,
+    min_price=1000,
+    min_kw=None,
+    mark=None,
+    new_cars_only=True,
+    browser=None,
+):
+    log_postfix = f" with price: {min_price} - {price}"
+    logger.debug(f"Processing {log_postfix}")
+    url = __get_url_with_queries(browser, price, min_price, min_kw, mark, new_cars_only)
+    logger.debug(f"Processing {url}")
+
+    # find all cars/trim level
+    model_urls = []
+
+    model_href = "//main//a[contains(@href, 'autokatalog')]"
+
+    load_more = "//button[text()='Weitere Ergebnisse']"
+    while browser.is_visible(by_xpath=load_more):
+        models_count = len(browser.find_elements(by_xpath=model_href))
+        browser.click(by_xpath=load_more)
+        browser.webdriver_wait(
+            lambda driver: models_count
+            < len(browser.find_elements(by_xpath=model_href)),
+            timeout=10,
+        )
 
     model_urls = [
-        browser.get_attribute(e, "href") for e in browser.find_elements(CSS_CAR_MODEL)
+        e.get_attribute("href") for e in browser.find_elements(by_xpath=model_href)
     ]
-    logger.debug(f"Found {len(model_urls)} models" + log_postfix)
 
-    trim_level_urls = []
-    for url in model_urls:
-        browser.get(url)
-        if browser.is_visible(CSS_ID_LOAD_ALL):
-            browser.click(CSS_ID_LOAD_ALL)
-            browser.wait_for_not_visible(ID_OVERLAY)
-        trim_level_urls += [
-            browser.get_attribute(e, "href")
-            for e in browser.find_elements(CSS_MODEL_trim_level)
-        ]
+    # first is skipped because it is a search button
+    model_urls = model_urls[1:]
 
-    logger.debug(f"Found {len(trim_level_urls)} trim levels" + log_postfix)
-    return trim_level_urls
+    logger.debug(f"Found {len(model_urls)} " + log_postfix)
+    return model_urls
 
 
 def __accept_cookies(browser):
@@ -231,7 +217,7 @@ def __get_tech_data(browser):
 
 
 @browser_decorator
-def _get_adac_data(url, browser=None):
+def get_adac_data(url, browser=None):
     browser.get(url)
     url = browser.get_current_url()
 
@@ -261,14 +247,6 @@ def _get_adac_data(url, browser=None):
     model_data.update(stats)
 
     return model_data
-
-
-def get_adac_data(url):
-    adac_data = _get_adac_data(url)
-    # TODO: refactor
-    if adac_data:
-        return adac_data
-    return None
 
 
 def __get_data_for_trim_processing(url, df_old_data=None):
@@ -310,8 +288,11 @@ def __save_models_and_trims(df__new, path):
 
 
 def __get_id(url):
-    # TODO: add new url support
-    return int(re.search(r"mid=(\d+)", url).group(1))
+    new_url = "autokatalog/marken-modelle" in url
+    if new_url:
+        return int(re.findall(r"\d+", url)[-1])
+    else:
+        return int(re.search(r"mid=(\d+)", url).group(1))
 
 
 def __save_iteratively(urls, path):
@@ -340,10 +321,10 @@ def __process_trim_url(data):
 
     is_processed_id = model_id in data["ids"]
     if is_processed_id:
-        processed_date = data["processed date"]
+        processed_date = data["processed date"].iloc[0]
         is_too_old = (
-            (np.datetime64(datetime.now()) - processed_date).days > DAYS_TO_EXPIRE
-        ).all()
+            np.datetime64(datetime.now()) - processed_date
+        ).days > DAYS_TO_EXPIRE
         if is_too_old:
             logger.warning(f"{model_id} updated long time ago")
         else:
@@ -390,15 +371,18 @@ def find_auto(price, output_path, json_path, override_model_urls=False, parallel
         with open(json_path, mode="r") as f:
             urls = json.load(f)
     else:
-        price_step = min_price = 5000
+        price_step = 5000
         # splitting into chunks to multiprocessing - 5000...10000,10000...15000,...
+        prices = [p for p in range(1000, price, price_step)]
+        prices.append(price)
+        chunks = [
+            {"price": prices[i], "min_price": prices[i - 1]}
+            for i in range(1, len(prices))
+        ]
         urls = flatten(
             concurrent_map(
                 _get_m_url,
-                [
-                    {"price": p, "min_price": p - 5000}
-                    for p in chain(range(min_price, price, price_step), [price])
-                ],
+                chunks,
             )
         )
         with open(json_path, mode="w") as f:

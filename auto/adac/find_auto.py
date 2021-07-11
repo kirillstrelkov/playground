@@ -281,7 +281,7 @@ def __save_models_and_trims(df__new, path):
         df = pd.read_csv(path)
         # TODO: set index to id and update instead of appen + reset_index !
         # TODO: remove/update rows if data is too old
-        df = df.append(df__new)
+        df = df.merge(df__new, how="right", on="adac_id")
     else:
         df = df__new
     df.to_csv(path, index=False)

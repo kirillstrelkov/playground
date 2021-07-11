@@ -1,6 +1,6 @@
 import os
+
 import pandas as pd
-import json
 
 
 def __main():
@@ -49,7 +49,9 @@ def __main():
         ]
         new_rows.append(data)
 
-    pd.DataFrame(new_rows).to_json(os.path.join(cur_dir, "car.json"), orient="records")
+    df = pd.DataFrame(new_rows)
+    df = df.drop_duplicates(subset=["adac_id"])
+    df.to_json(os.path.join(cur_dir, "car.json"), orient="records")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ class Column(object):
     FUEL_TANK_SIZE = "Tankgröße"
     BATTERY_CAPACITY = "Batteriekapazität (Netto) in kWh"
     CONSUPTION_TOTAL_NEFZ = "Verbrauch Gesamt (NEFZ)"
-    CONSUPTION_COMBINED_WLTP = "Verbrauch nach WLTP kombiniert"
+    CONSUPTION_COMBINED_WLTP = "Verbrauch kombiniert (WLTP)"
     BODY_TYPE = "Karosserie"
     # New columns:
     NAME = "name"
@@ -62,14 +62,13 @@ Länge
 Kofferraumvolumen normal
 Kofferraumvolumen dachhoch mit umgeklappter Rücksitzbank
 Bodenfreiheit maximal
-Fahrzeugpreis für die Berechnung
 Wertverlust
 Betriebskosten
 Fixkosten
 Werkstattkosten
-KFZ-Steuer pro Jahr
+KFZ-Steuer pro Jahr ohne Steuerbefreiung
 Haftpflichtbeitrag 100%
-Vollkaskobetrag 100% 500 Euro SB
+Vollkaskobetrag 100% 500 € SB
 """.strip().splitlines() + [
         Column.COSTS_FIX,
         Column.COSTS_OPERATING,

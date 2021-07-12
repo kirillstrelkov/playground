@@ -57,6 +57,12 @@ def test_join_adac_and_score(df_cars, df_scored_de_discount):
     assert df_joined[df_joined["name"].str.contains("Impreza")].shape[0] >= 5
 
 
+def test_all_vs_mentioned(df_scored, df_scored_mentioned_only):
+    scored_rows = df_scored.shape[0]
+    scored_mentioned_rows = df_scored_mentioned_only.shape[0]
+    assert scored_rows > scored_mentioned_rows
+
+
 def test_model3_score_better_than_impreza(df_scored_de_discount):
     model = df_scored_de_discount[
         df_scored_de_discount["name"].str.contains("Tesla")
@@ -134,8 +140,8 @@ def test_calc_cost_to_own_208(df_filtered_cars):
     auto = "Peugeot 208"
     df = _get_df_with_cost_to_own(auto, filtered_cars=df_filtered_cars)
     assert len(df) > 1
-    for index, car in df.iterrows():
-        assert 300 < car[Column.MY_M_COSTS] < 500
+    for _, car in df.iterrows():
+        assert 300 < car[Column.MY_M_COSTS] < 510
         capacity = car[Column.BATTERY_CAPACITY]
         tank = car[Column.FUEL_TANK_SIZE]
         if car[Column.ENGINE_TYPE] == "Elektro":
@@ -161,7 +167,7 @@ def test_calc_cost_to_own_ceed(df_filtered_cars):
     assert len(df) > 1
     for index, car in df.iterrows():
         assert car[Column.MY_M_COSTS] > 300
-        assert car[Column.MY_M_COSTS] < 530
+        assert car[Column.MY_M_COSTS] < 550
         assert car[Column.ACCELERATION] < 12
 
 

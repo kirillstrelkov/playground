@@ -2,16 +2,11 @@ import os
 import re
 
 import pandas as pd
+from loguru import logger
 from numpy import nan
 from pandas.core.frame import DataFrame
 
-NOT_NA_COLUMNS = [
-    "Autom. Abstandsregelung",
-    # "Fernlichtassistent", NOTE: Tesla doesn't have it
-    "Regensensor",
-    "Lichtsensor",
-    # "Fußgängererkennung",
-]
+ZERO_POINTS_MAPPING = {nan, "nicht bekannt", "n.b.", "Keine"}
 
 
 class Column(object):
@@ -20,6 +15,7 @@ class Column(object):
     COSTS_OPERATING = "Betriebskosten"
     COSTS_FIX = "Fixkosten"
     COSTS_WORKSHOP = "Werkstattkosten"
+    COSTS_DEPRECIATION = "Wertverlust"
     MARK = "Marke"
     SERIE = "Baureihe"
     PERFORMANCE_KW = "Leistung maximal in kW (Systemleistung)"
@@ -34,12 +30,11 @@ class Column(object):
     BODY_TYPE = "Karosserie"
     # New columns:
     NAME = "name"
-    MY_M_COSTS = "my monthly costs"
+    CTO = "Costs to own"
     TOTAL_PRICE = "Total price"
     RANGE = "Range"
     TOTAL_SCORE = "Total Score"
     EURO_PER_SCORE = "Euro per score"
-    WARRANTY_Y = "Garantie y"
 
 
 class ColumnSpec(object):
@@ -83,32 +78,12 @@ Vollkaskobetrag 100% 500 € SB
     ]
 
 
-def _get_columns_with_euro(df=None):
-    if not df:
-        df = _filtered_cars()
-
-    cols = []
-    for col in df.columns:
-        if df[col].apply(lambda x: "euro" in str(x).lower()).any():
-            cols.append(col)
-
-    return cols
-
-
-def _filter_column(df, column):
-    return df[df[column].isin(_get_not_na_set(df[column]))]
-
-
-def _get_not_na_set(serie):
-    return [s for s in set(serie.tolist()) if not pd.isna(s)]
-
-
 def __convert_to_float(x):
     if type(x) == str:
         match = re.search(r"\d+[.,]?\d*", x)
 
         if match:
-            return float(match.group().replace(",", "."))
+            return float(match.group().replace(".", "").replace(",", "."))
         else:
             return nan
     else:
@@ -183,23 +158,60 @@ def __fix_bad_data(df):
 
 
 def _fix_missing_values_by_adding_avg(df):
-    # by Default - add 40% percentile data
-    # add * to names if cars was modified
-    def get_avg(col, groupby, value):
-        return df[df[groupby] == value].groupby(groupby).mean().get(col, [pd.NA])[0]
+    def fix_name(df, df_bad, groupby_col, value):
+        if (
+            not df.loc[
+                (df[groupby_col] == value) & (df.id.isin(df_bad.id)),
+                Column.NAME,
+            ]
+            .iloc[0]
+            .endswith("*")
+        ):
+            df.loc[
+                (df[groupby_col] == value) & (df.id.isin(df_bad.id)),
+                Column.NAME,
+            ] += "*"
 
-        # fix by average mark, modell if that doesn't work fix by average mark
+    # fix average by SERIE
+    groupby_col = Column.SERIE
+    for col in Constant.COLS_WITH_NUMERIC_DATA:
+        if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
+            continue
 
-    for groupby_col in [Column.SERIE, Column.MARK]:
-        for col in Constant.COLS_WITH_NUMERIC_DATA:
-            if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
-                continue
+        df_bad = df[pd.isna(df[col])]
+        for value in df_bad[groupby_col].unique():
+            df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id)), col] = (
+                df[df[groupby_col] == value]
+                .groupby(groupby_col)
+                .mean()
+                .get(col, [pd.NA])[0]
+            )
+            fix_name(df, df_bad, groupby_col, value)
 
-            df_bad = df[pd.isna(df[col])]
-            for value in df_bad[groupby_col].unique():
-                df.loc[
-                    (df[groupby_col] == value) & (df.id.isin(df_bad.id)), col
-                ] = get_avg(col, groupby_col, value)
+    # fix average by MARK and BODY_TYPE
+    groupby_col = Column.MARK
+    for col in Constant.COLS_WITH_NUMERIC_DATA:
+        if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
+            continue
+
+        df_bad = df[pd.isna(df[col])]
+        for value in df_bad[groupby_col].unique():
+            body_types = (
+                df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id))][
+                    Column.BODY_TYPE
+                ]
+                .unique()
+                .tolist()
+            )
+            # NOTE: sometimes might be multiple body types
+            body_type = body_types[0]
+            df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id)), col] = (
+                df[(df[groupby_col] == value) & (df[Column.BODY_TYPE] == body_type)]
+                .groupby(groupby_col)
+                .mean()
+                .get(col, [pd.NA])[0]
+            )
+            fix_name(df, df_bad, groupby_col, value)
 
     return df
 
@@ -245,10 +257,11 @@ def _get_df_with_cost_to_own(name=None, de_discount=True, filtered_cars=None):
         df = df.apply(__calc_range, axis=1)
 
     # operating and workshop should be add due to 30k km per year
-    df[Column.MY_M_COSTS] = (
+    df[Column.CTO] = (
         df[Column.COSTS_FIX]
         + df[Column.COSTS_OPERATING] * 2
         + df[Column.COSTS_WORKSHOP] * 2
+        + df[Column.COSTS_DEPRECIATION]
     )
 
     return df.round(2)
@@ -265,19 +278,6 @@ def _filtered_cars(df=None):
 
     df = _fix_numeric_columns(df)
     df = __fix_bad_data(df)
-
-    for col in NOT_NA_COLUMNS:
-        df = _filter_column(df, col)
-
-    # TODO: remove filtering?
-    # Filter seats
-    df = df[df[Column.SEATS] > 3]
-
-    df = df[df[Column.BODY_TYPE] != "Kombi"]
-
-    # Filter transmission
-    df = df[df[Column.TRANSMISSION] != Constant.TRANSMISSION_MANUAL]
-
     df = _fix_missing_values_by_adding_avg(df)
 
     return df
@@ -285,10 +285,6 @@ def _filtered_cars(df=None):
 
 def __get_column_uniq_values(df):
     return df.unique()
-
-
-def __string_to_adac_values(string):
-    return eval(string)
 
 
 def _get_sorted_uniq_values(df, ordered_values, reverse=False):
@@ -320,6 +316,22 @@ def _get_sorted_uniq_values(df, ordered_values, reverse=False):
     )
 
 
+def _get_value_scored_mappings(df, ordered_values, reverse=False):
+    assert not set(ZERO_POINTS_MAPPING).intersection(
+        set(ordered_values)
+    ), f"{ZERO_POINTS_MAPPING} shound not be in {ordered_values}"
+    sorted_dac_values = _get_sorted_uniq_values(df, ordered_values, reverse)
+    values_data = dict(
+        zip(
+            sorted_dac_values,
+            [(v + 1) / (len(sorted_dac_values)) for v in range(len(sorted_dac_values))],
+        )
+    )
+    values_data.update(zip(ZERO_POINTS_MAPPING, [0] * len(ZERO_POINTS_MAPPING)))
+
+    return values_data
+
+
 def _apply_de_discount(df, column):
     def get_discount(price, motor_type):
         netto_price = price * 0.81
@@ -346,10 +358,14 @@ def _apply_de_discount(df, column):
 
 
 def get_scored_df(
-    only_mentioned_cars=True, de_discount=False, keep_columns=None, filtered_cars=None
+    only_mentioned_cars=True,
+    de_discount=False,
+    keep_columns=None,
+    filtered_cars=None,
+    spec_file="cars.xlsx",
 ):
     spec_df = pd.read_excel(
-        os.path.join(os.path.dirname(__file__), "cars.xlsx"), sheet_name="Spec"
+        os.path.join(os.path.dirname(__file__), spec_file), sheet_name="Spec"
     )
     spec_df = spec_df.drop(columns=[ColumnSpec.PREFIX])
 
@@ -384,7 +400,7 @@ def get_scored_df(
     weighted_df[Column.SERIE] = df[Column.SERIE]
     weighted_df[Column.PERFORMANCE_KW] = df[Column.PERFORMANCE_KW]
     weighted_df[Column.TOTAL_PRICE] = df[Column.TOTAL_PRICE]
-    weighted_df[Column.MY_M_COSTS] = df[Column.MY_M_COSTS]
+    weighted_df[Column.CTO] = df[Column.CTO]
     weighted_df[Column.RANGE] = df[Column.RANGE]
     if keep_columns:
         for col in keep_columns:
@@ -398,9 +414,8 @@ def get_scored_df(
         reverse = row[ColumnSpec.REVERSED] == "y"
 
         if only_mentioned_cars:
-            # assert pd.notna(weight)
-            # skip if na
             if pd.isna(weight):
+                logger.debug(f"Missing {weight} for {feature}")
                 continue
 
         if pd.isna(adac_col):
@@ -408,30 +423,41 @@ def get_scored_df(
                 df[Column.NAME], row.drop(spec_add_data_col), weight
             )
         else:
-            if df[adac_col].dtypes == object:
-                # TODO: add support for regexp and not strings only
-                df_uniq_values = __get_column_uniq_values(df[adac_col]).tolist()
-
-                msg = f"Wrong data '{adac_vals}' in '{feature}' column: '{adac_col}', please use all possible values: {df_uniq_values}"
-
-                assert not pd.isna(adac_vals), msg
-
+            if df[adac_col].dtypes == object and type(adac_vals) == str:
                 adac_vals = eval(adac_vals)
-                adac_vals = _get_sorted_uniq_values(df[adac_col], adac_vals, reverse)
-                diff = set(df_uniq_values).difference(set(adac_vals))
-
-                # TODO: find fix for nan, nan is not hashable?????
-                # assert not diff, msg + f", missing values: {diff}"
-
-                values_data = dict(
-                    zip(
-                        adac_vals,
-                        [
-                            v / (len(adac_vals) - 1) * weight
-                            for v in range(len(adac_vals))
-                        ],
+                if type(adac_vals) == dict:
+                    values_data = adac_vals
+                    values_data.update(
+                        zip(ZERO_POINTS_MAPPING, [0] * len(ZERO_POINTS_MAPPING))
                     )
-                )
+                else:
+                    adac_vals_with_zero = list(ZERO_POINTS_MAPPING) + adac_vals
+                    # TODO: find better implementation
+                    # `df_uniq_values` might contain values with euro: 100 euro, 200 euro - this is treated as one regexp
+                    # that is my we exclude it in assertion but print in debug
+                    df_uniq_values = __get_column_uniq_values(df[adac_col]).tolist()
+
+                    msg = f"Wrong data '{adac_vals}' in '{feature}' column: '{adac_col}' file '{spec_file}', please use all possible values: {df_uniq_values}"
+
+                    df_uniq_non_euro_values = [
+                        v
+                        for v in df_uniq_values
+                        if (
+                            type(v) != str
+                            or ("euro" not in v.lower() and "jahr" not in v.lower())
+                        )
+                        and not pd.isna(v)
+                    ]
+
+                    assert set(df_uniq_non_euro_values).issubset(
+                        set(adac_vals_with_zero)
+                    ), msg
+
+                    values_data = _get_value_scored_mappings(
+                        df[adac_col], adac_vals, reverse
+                    )
+                for key, value in values_data.items():
+                    values_data[key] = value * weight
 
                 assert min(values_data.values()) == 0
                 assert max(values_data.values()) == weight
@@ -459,6 +485,10 @@ def get_scored_df(
 
 
 def __get_feature_scores_df(df, weight=10, reverse=False):
+    assert (
+        df.dtypes == float
+    ), f"Expecting `float` but for `{df.name}` found objects: {df.unique().tolist()}"
+
     min = df.min()
     max = df.max()
     if max == min:

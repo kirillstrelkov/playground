@@ -29,3 +29,4 @@ snakeviz
 pandoc
 nbconvert
 chart_studio
+python-dotenv

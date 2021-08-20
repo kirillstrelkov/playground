@@ -1,6 +1,4 @@
-import hashlib
 import os
-import pickle
 import tempfile
 from datetime import datetime, timedelta
 from enum import IntEnum, auto
@@ -9,10 +7,10 @@ import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
+from caching_utils import get_cached_value, get_hashsum
 from loguru import logger
 from matplotlib import pyplot
 from seaborn import barplot, boxplot, lineplot, scatterplot
-from utils.file import read_content, save_file
 from utils.misc import concurrent_map
 
 
@@ -62,24 +60,11 @@ TEMP_FOLDER = os.path.join(tempfile.gettempdir(), "stock_analysis")
 
 
 def _get_hashsum(*args):
-    m = hashlib.sha256()
-    m.update(",".join([str(a) for a in args]).encode("utf-8"))
-    hashsum = m.hexdigest()
-    return hashsum
+    return get_hashsum(*args)
 
 
 def _get_cached_value(hashsum, func_get_value):
-    os.makedirs(TEMP_FOLDER, exist_ok=True)
-
-    path = os.path.join(TEMP_FOLDER, hashsum)
-    logger.debug(f"Using history file: {path}")
-
-    if not os.path.exists(path):
-        data = func_get_value()
-        save_file(path, pickle.dumps(data), mode="wb", encoding=None)
-
-    data = pickle.loads(read_content(path, mode="rb", encoding=None))
-    return data
+    return get_cached_value(hashsum, func_get_value, TEMP_FOLDER)
 
 
 def get_history(symbols, start_date, end_date, interval):

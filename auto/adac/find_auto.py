@@ -61,7 +61,6 @@ def __get_url_with_queries(
     browser: Browser,
     price: int,
     min_price=1000,
-    min_kw=None,
     mark=None,
     new_cars_only=True,
 ):
@@ -74,47 +73,16 @@ def __get_url_with_queries(
     __accept_cookies(browser)
 
     # add price to url
+    browser.click(by_css="[for='basePrice']")
+    price_elements = browser.find_elements(
+        by_css="#basePrice-container input[name='basePrice']"
+    )
 
-    min_supported_price = int(
-        fix_german_number(
-            browser.get_value(
-                by_xpath="//*[@id='basePrice']/../..//*[@for='basePrice']",
-                visible=False,
-            )
-        )
-    )
-    max_supported_price = int(
-        fix_german_number(
-            browser.get_value(
-                by_xpath="//*[@id='basePrice']/../..//*[@for='basePrice-secondary']",
-                visible=False,
-            )
-        )
-    )
+    min_supported_price = int(fix_german_number(browser.get_value(price_elements[0])))
+    max_supported_price = int(fix_german_number(browser.get_value(price_elements[1])))
     assert min_supported_price <= min_price
     assert max_supported_price >= price
     url += f"&basePrice.min={min_price}&basePrice.max={price}"
-
-    if min_kw:
-        # add kW to url
-        min_supported_kw = int(
-            fix_german_number(
-                browser.get_value(
-                    by_xpath="//*[@id='powerInKW']/../..//*[@for='powerInKW']",
-                    visible=False,
-                )
-            )
-        )
-        max_supported_kw = int(
-            fix_german_number(
-                browser.get_value(
-                    by_xpath="//*[@id='powerInKW']/../..//*[@for='powerInKW-secondary']",
-                    visible=False,
-                )
-            )
-        )
-        assert min_supported_kw <= min_kw <= max_supported_kw
-        url += f"&powerInKW.min={min_kw}&powerInKW.max={max_supported_kw}"
 
     # add mark to url
     browser.get(url)
@@ -124,6 +92,7 @@ def __get_url_with_queries(
         btn_search = "//main//button[contains(text(), 'anzeigen')]"
         browser.click(by_xpath=btn_search)
         browser.wait_for_visible(by_xpath=btn_search)
+        # NOTE: might fail because of loading
 
     return browser.get_current_url()
 
@@ -132,14 +101,13 @@ def __get_url_with_queries(
 def get_model_urls(
     price,
     min_price=1000,
-    min_kw=None,
     mark=None,
     new_cars_only=True,
     browser=None,
 ):
     log_postfix = f" with price: {min_price} - {price}"
     logger.debug(f"Processing {log_postfix}")
-    url = __get_url_with_queries(browser, price, min_price, min_kw, mark, new_cars_only)
+    url = __get_url_with_queries(browser, price, min_price, mark, new_cars_only)
     logger.debug(f"Processing {url}")
 
     # find all cars/trim level
@@ -182,14 +150,8 @@ def __get_cost_data(browser):
 
     browser.click(css_tab)
 
-    css_td = (By.CSS_SELECTOR, "td")
-    css_tr = (By.CSS_SELECTOR, "tr")
-    data = {
-        tuple([browser.get_text(td) for td in browser.find_descendants(row, css_td)])
-        for row in browser.find_elements(css_tr)
-        if browser.is_visible(row)
-    }
-    data = dict({t for t in data if len(t) > 1})
+    cells = [browser.get_text(e) for e in browser.find_elements(by_css="td")]
+    data = dict(zip(cells[::2], cells[1::2]))
 
     css_additional = (By.CSS_SELECTOR, "main div > p")
     additional = [browser.get_text(p) for p in browser.find_elements(css_additional)]
@@ -204,16 +166,15 @@ def __get_tech_data(browser):
 
     browser.click(css_tab_tech)
 
-    css_td = (By.CSS_SELECTOR, "td")
-    css_tr = (By.CSS_SELECTOR, "tr")
-    data = {
-        tuple([browser.get_text(td) for td in browser.find_descendants(row, css_td)])
-        for row in browser.find_elements(css_tr)
-        if browser.is_visible(row)
-    }
-    data = {t for t in data if len(t) > 1}
+    cells = [browser.get_text(e) for e in browser.find_elements(by_css="td")]
+    data = dict(zip(cells[::2], cells[1::2]))
 
-    return dict(data)
+    data["image"] = browser.get_attribute(
+        by_css="main div picture img",
+        attr="src",
+    )
+
+    return data
 
 
 @browser_decorator
@@ -223,16 +184,10 @@ def get_adac_data(url, browser=None):
 
     __accept_cookies(browser)
 
-    css_model_name = (By.CSS_SELECTOR, "div h1")
-    css_image = (By.CSS_SELECTOR, "main div > img")
-
-    possible_images = browser.get_attribute(css_image, "srcset")
-
     model_data = {
-        "name": re.sub(r"\s+", " ", browser.get_text(css_model_name)),
+        "name": re.sub(r"\s+", " ", browser.get_text(by_css="div h1")),
         "url": url,
         "id": re.findall(r"/(\d+)", url)[-1],
-        "image": possible_images.split(",")[-1].split(" ")[-2],
         "processed date": datetime.now(),
     }
 
@@ -276,14 +231,14 @@ def __get_data_for_trim_processing(url, df_old_data=None):
     }
 
 
-def __save_models_and_trims(df__new, path):
+def __save_models_and_trims(df_new, path):
     if os.path.exists(path):
         df = pd.read_csv(path)
         # TODO: set index to id and update instead of appen + reset_index !
         # TODO: remove/update rows if data is too old
-        df = df.merge(df__new, how="right", on="adac_id")
+        df = pd.concat([df, df_new])
     else:
-        df = df__new
+        df = df_new
     df.to_csv(path, index=False)
 
 
@@ -314,6 +269,8 @@ def __save_iteratively(urls, path):
 
 
 def __process_trim_url(data):
+    # TODO: tenacity retry if failed
+
     url = data["url"]
     processed_checksums = data["checksums"]
 
@@ -389,7 +346,7 @@ def find_auto(price, output_path, json_path, override_model_urls=False, parallel
             # Add my Subaru
             # TODO: fix Wertverlust, ADAC - Klassenübliche Ausstattung
             urls.append(
-                "https://www.adac.de/infotestrat/autodatenbank/wunschauto/detail.aspx?mid=283761"
+                "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/subaru/impreza/v/283761/"
             )
             json.dump(urls, f)
 

@@ -9,7 +9,7 @@ def __filter_model_urls(urls, url_part):
 
 
 def test_get_models_urls_vw():
-    price = 24000
+    price = 28000
     mark = "VW"
     model_urls = get_model_urls(price, mark=mark)
     assert len(model_urls) > 30
@@ -19,30 +19,9 @@ def test_get_models_urls_vw():
 
 
 def test_get_models_urls():
-    price = 15000
+    price = 20000
     model_urls = get_model_urls(price)
-    assert len(model_urls) > 200
-
-
-def test_get_adac_data_polo():
-    url = "https://www.adac.de/infotestrat/autodatenbank/wunschauto/detail.aspx?mid=304532&bezeichnung=vw-polo-1-0-mpi-beats"
-    data = get_adac_data(url)
-    for key, expected in (
-        ("id", "304532"),
-        (
-            "image",
-            "https://www.adac.de/_ext/itr/tests/ADAC40/Autodaten/Bilder/IM05016_1_VW_Polo_VI_1566x884.jpg",
-        ),
-        ("LED-Scheinwerfer", "985 Euro"),
-        ("Durchrostung", "12 Jahre"),
-        ("Metallic-Lackierung", "495 Euro"),
-        ("Typ", "beats"),
-        ("Fixkosten", "86 €"),
-        ("Typklassen (KH/VK/TK)", "15/16/17"),
-        ("Leistung maximal in kW (Systemleistung)", "59"),
-    ):
-        assert key in data
-        assert data[key] == expected
+    assert len(model_urls) > 50
 
 
 def test_get_adac_data_alfa():
@@ -54,8 +33,8 @@ def test_get_adac_data_alfa():
         ("Durchrostung", "8 Jahre"),
         ("Metallic-Lackierung", "926 Euro"),
         ("Typ", "AT8"),
-        ("Fixkosten", "137 €"),
-        ("Typklassen (KH/VK/TK)", "20/24/23"),
+        ("Fixkosten", "155 €"),
+        ("Typklassen (KH/VK/TK)", "20/24/24"),
         ("Leistung maximal in kW (Systemleistung)", "147"),
     ):
         assert key in data
@@ -67,8 +46,8 @@ def test_get_adac_data_corsa():
     data = get_adac_data(url)
     for key, expected in (
         ("id", "312301"),
-        ("Fixkosten", "88 €"),
-        ("Betriebskosten", "95 €"),
+        ("Fixkosten", "87 €"),
+        ("Betriebskosten", "91 €"),
     ):
         assert key in data
         assert data[key] == expected
@@ -80,7 +59,7 @@ def test_get_adac_data_tesla():
     for key, expected in (
         ("id", "308033"),
         ("Bremsassistent", "Serie"),
-        ("checksum", "5b35eed7639a6ac18027046745e136a2"),
+        ("checksum", "dd1db9094da08dbc90ffb6b206a93c6b"),
     ):
         assert key in data
         assert data[key] == expected

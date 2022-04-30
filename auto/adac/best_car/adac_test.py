@@ -1,9 +1,15 @@
 import os
 
 import pandas as pd
-from auto.adac.best_car.find_best_car import Column, _filtered_cars
+from auto.adac.best_car.find_best_car import (
+    Column,
+    _filtered_cars,
+    _fix_numeric_columns,
+    _get_fixed_column_name,
+)
 from auto.adac.best_car.utils import (
     COLUMN_FEATURE,
+    COLUMN_FEATURE_NUNIQUE,
     COLUMN_FEATURE_RANGE,
     COLUMN_FEATURE_TYPE,
     COLUMN_FEATURE_WEIGHT,
@@ -15,12 +21,36 @@ ADAC_PATH = os.path.join(os.path.dirname(__file__), "../adac.csv")
 FEATURES_PATH = os.path.join(os.path.dirname(__file__), "feature.csv")
 
 
+def __get_range(df, x):
+    try:
+        tdf = _fix_numeric_columns(df)
+        vals = tdf[_get_fixed_column_name(x)]
+        return vals.max() - vals.min()
+    except:
+        return None
+
+
 def __process_initial_data(df):
     if not os.path.exists(FEATURES_PATH):
         new_df = df.agg(["nunique"]).transpose().reset_index()
-        new_df.columns = [COLUMN_FEATURE, COLUMN_FEATURE_RANGE]
-        new_df[COLUMN_FEATURE_TYPE] = None
-        new_df[COLUMN_FEATURE_WEIGHT] = None
+        new_df.columns = [
+            COLUMN_FEATURE,
+            COLUMN_FEATURE_NUNIQUE,
+        ]
+        new_df[COLUMN_FEATURE_RANGE] = new_df[COLUMN_FEATURE_NUNIQUE]
+        new_df[COLUMN_FEATURE_RANGE] = new_df[COLUMN_FEATURE].apply(
+            lambda x: __get_range(df, x)
+        )
+
+        new_df[COLUMN_FEATURE_TYPE] = ",".join(FeatureType.all())
+        new_df[COLUMN_FEATURE_WEIGHT] = 1
+        new_df.columns = [
+            COLUMN_FEATURE,
+            COLUMN_FEATURE_NUNIQUE,
+            COLUMN_FEATURE_RANGE,
+            COLUMN_FEATURE_TYPE,
+            COLUMN_FEATURE_WEIGHT,
+        ]
         new_df.to_csv(FEATURES_PATH, index=None)
 
 
@@ -42,9 +72,12 @@ def df_adac_fixed(df_adac):
 
 def test_all_features(df_features, df_adac):
     assert len(df_adac.columns.tolist()) == len(set(df_adac.columns.tolist()))
-    assert sorted(df_adac.columns.tolist()) == sorted(
-        df_features[COLUMN_FEATURE].tolist()
-    )
+    set1 = set(df_adac.columns.tolist())
+    set2 = set(df_features[COLUMN_FEATURE].tolist())
+    diff = set1.difference(set2)
+    assert not diff
+    diff = set2.difference(set1)
+    assert not diff
 
 
 def test_all_features_reviews(df_features):

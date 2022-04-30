@@ -47,7 +47,7 @@ def test_get_adac_data_corsa():
     for key, expected in (
         ("id", "312301"),
         ("Fixkosten", "87 €"),
-        ("Betriebskosten", "91 €"),
+        ("Betriebskosten", "99 €"),
     ):
         assert key in data
         assert data[key] == expected
@@ -59,7 +59,7 @@ def test_get_adac_data_tesla():
     for key, expected in (
         ("id", "308033"),
         ("Bremsassistent", "Serie"),
-        ("checksum", "dd1db9094da08dbc90ffb6b206a93c6b"),
+        ("checksum", "316738feef8259a47ac839464cb85c82"),
     ):
         assert key in data
         assert data[key] == expected

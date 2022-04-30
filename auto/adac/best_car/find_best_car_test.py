@@ -24,6 +24,9 @@ from auto.adac.best_car.utils import (
 )
 from numpy import nan
 
+__SUBARU_MY_IMPREZA_NAME = "Subaru Impreza 2.0i Exclusive"
+__TESLA_M3_NAME = "Tesla Model 3"
+
 
 @pytest.fixture
 def df_cars():
@@ -50,6 +53,19 @@ def df_features():
     return pd.read_csv(FEATURES_PATH)
 
 
+def _get_diff(df, df_a, df_b):
+    df_tmp = df[df[Column.ID].isin([df_a[Column.ID], df_b[Column.ID]])]
+    return df_tmp.transpose()
+
+
+def _get_car_by_name(df, name):
+    df_filtered = df[df[Column.NAME].str.contains(name)].sort_values(
+        [Column.TOTAL_SCORE, _get_fixed_column_name(Column.PRICE)],
+        ascending=[False, True],
+    )
+    return df_filtered.iloc[0]
+
+
 def test_scored_parents_suv_is_better(df_scored_parent):
     df = df_scored_parent
     for car_name, suv_name in [
@@ -66,11 +82,9 @@ def test_scored_parents_suv_is_better(df_scored_parent):
 
 
 def test_ioniq_plugin_consumption_fixed(df_scored_de_discount_minmax_scaler):
-    car_plugin = df_scored_de_discount_minmax_scaler[
-        df_scored_de_discount_minmax_scaler["name"].str.contains(
-            "Hyundai IONIQ PlugIn-Hybrid Prime"
-        )
-    ].iloc[0]
+    car_plugin = _get_car_by_name(
+        df_scored_de_discount_minmax_scaler, "Hyundai IONIQ PlugIn-Hybrid"
+    )
 
     assert car_plugin[_get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)] > 3
 
@@ -114,12 +128,56 @@ def test_max_weights(df_scored_de_discount_minmax_scaler, df_features):
             assert max_feature < weight + 0.01
 
 
+def test_consumption(
+    df_scored_de_discount_minmax_scaler,
+):
+    col_fixed = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
+    col_scaled = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
+    df_e = df_scored_de_discount_minmax_scaler[
+        df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] == "Elektro"
+    ]
+    df_non_e = df_scored_de_discount_minmax_scaler[
+        df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] != "Elektro"
+    ]
+
+    e_scaled_min = df_e[col_scaled].min()
+    e_scaled_mean = df_e[col_scaled].mean()
+    e_scaled_max = df_e[col_scaled].max()
+
+    non_e_scaled_min = df_non_e[col_scaled].min()
+    non_e_scaled_mean = df_non_e[col_scaled].mean()
+    non_e_scaled_max = df_non_e[col_scaled].max()
+
+    # electric
+    e_car_min = df_e[df_e[col_scaled] == e_scaled_min].iloc[0]
+    e_car_max = df_e[df_e[col_scaled] == e_scaled_max].iloc[0]
+    assert e_car_min[col_fixed] > e_car_max[col_fixed]
+    assert e_car_min[col_scaled] < e_car_max[col_scaled]
+
+    # non electric
+    non_e_car_min = df_non_e[df_non_e[col_scaled] == non_e_scaled_min].iloc[0]
+    non_e_car_max = df_non_e[df_non_e[col_scaled] == non_e_scaled_max].iloc[0]
+    assert non_e_car_min[col_fixed] > non_e_car_max[col_fixed]
+    assert non_e_car_min[col_scaled] < non_e_car_max[col_scaled]
+
+    tesla = _get_car_by_name(df_scored_de_discount_minmax_scaler, __TESLA_M3_NAME)
+    subaru = _get_car_by_name(
+        df_scored_de_discount_minmax_scaler, __SUBARU_MY_IMPREZA_NAME
+    )
+    assert tesla[col_fixed] < df_e[col_fixed].mean()
+    assert tesla[col_scaled] > e_scaled_mean
+
+    assert subaru[col_fixed] > df_non_e[col_fixed].mean()
+    assert subaru[col_scaled] < 0.5
+    assert subaru[col_scaled] < non_e_scaled_mean
+
+
 def test_tesla_scaled_consumption_better_than_subaru(
     df_scored_de_discount_minmax_scaler,
 ):
     df = df_scored_de_discount_minmax_scaler
-    tesla = df[df[Column.ID] == 322475].iloc[0]
-    subaru = df[df[Column.ID] == 283761].iloc[0]
+    tesla = _get_car_by_name(df, __TESLA_M3_NAME)
+    subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
 
     fixed_consumption = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
     scaled_consumption = _get_fixed_and_scaled_column_name(
@@ -144,23 +202,35 @@ def test_model3_score_better_than_impreza(df_scored_de_discount_minmax_scaler):
 
 
 @pytest.mark.parametrize(
-    "id", [320815, 320817, 320814, 322563, 322564, 320083, 283761, 311428]
+    "name",
+    [
+        "VW ID.3 Pro Performance",
+        "VW ID.4 Pure Performance",
+        "VW ID.3 Pro S",
+        "VW ID.5 Pro",
+        "VW ID.5 Pro Performance",
+        "KIA EV6",
+        __SUBARU_MY_IMPREZA_NAME,
+        "Mazda MX-30",
+    ],
 )
-def test_model3_better(df_scored_de_discount_minmax_scaler, id):
+def test_model3_better(df_scored_de_discount_minmax_scaler, name):
     df = df_scored_de_discount_minmax_scaler
-    tesla = df[df[Column.ID] == 322475].iloc[0]
-    car = df[df[Column.ID] == id].iloc[0]
+    tesla = _get_car_by_name(df, __TESLA_M3_NAME)
+    car = _get_car_by_name(df, name)
+    _df_diff = _get_diff(df, tesla, car)
     assert tesla[Column.TOTAL_SCORE] > car[Column.TOTAL_SCORE]
 
 
 def test_ioniq_plugin_better(df_scored_de_discount_minmax_scaler):
     df = df_scored_de_discount_minmax_scaler
     df = _filter_by_models(df, ["hyundai ioniq"])
-    car_plugin = df[df["name"].str.contains("Hyundai IONIQ PlugIn-Hybrid Prime")].iloc[
-        0
-    ]
-    car_hybrid = df[df["name"].str.contains("Hyundai IONIQ Hybrid Prime")].iloc[0]
-
+    car_plugin = _get_car_by_name(
+        df_scored_de_discount_minmax_scaler, "Hyundai IONIQ PlugIn-Hybrid"
+    )
+    car_hybrid = _get_car_by_name(
+        df_scored_de_discount_minmax_scaler, "Hyundai IONIQ Hybrid"
+    )
     assert car_plugin[Column.TOTAL_SCORE] > car_hybrid[Column.TOTAL_SCORE]
 
 
@@ -178,8 +248,9 @@ def test_ioniq_with_german_discount(df_scored_de_discount_minmax_scaler):
 
 def test_small_test(df_scored_de_discount_minmax_scaler):
     df = df_scored_de_discount_minmax_scaler
-    df_subaru = df[df.id == 283761].iloc[0]
-    df_bmw = df[df.id == 315738].iloc[0]
+    df_subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
+    df_bmw = _get_car_by_name(df, "BMW 118i M")
+    df_tmp = df[df[Column.ID].isin([df_subaru[Column.ID], df_bmw[Column.ID]])]
 
     # less is better
     col_price = _get_fixed_column_name(Column.PRICE)

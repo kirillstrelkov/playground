@@ -141,6 +141,7 @@ def _get_mappings(column, values):
         "Airbag Sonstige - Bezeichnung": [
             "Knieairbag Fahrer und Fußgängerairbag",
             "Knieairbag Fahrer und Beifahrer",
+            "Knieairbag Fahrer (Serie), Gurtairbag hinten",
             "Mittenairbag vorne",
             "Knieairbag Fahrer",
             "Anti-Submarining-Airbag",
@@ -167,10 +168,12 @@ def _get_mappings(column, values):
             "D",
             "E",
             "F",
+            "G",
         ],
-        "Federung hinten": ["Drehstab", "Schraube", "Blattfeder"],
+        "Federung hinten": ["Luft", "Drehstab", "Schraube", "Blattfeder"],
         "Bremse hinten": ["Scheibe", "Trommel"],
-        "Federung vorne": ["Blattfeder", "Schraube"],
+        "Federung vorne": ["Luft", "Blattfeder", "Schraube"],
+        "Antriebsart": ["Allrad", "Heck", "Front"],
         "Getriebeart": [
             "Automatikgetriebe",
             "Automat. Schaltgetriebe (Doppelkupplung)",
@@ -434,11 +437,13 @@ def _apply_scaler(df, columns, reversed=False):
             data = _df[_columns].values
         else:
             data = _df[_columns]
-        tmp_df = DataFrame(columns=_scaled_columns, data=scaler_obj.fit_transform(data))
+        _tmp_df = DataFrame(
+            columns=_scaled_columns, data=scaler_obj.fit_transform(data)
+        )
 
         if reversed:
-            tmp_df = 1 - tmp_df
-        return tmp_df
+            _tmp_df = 1 - _tmp_df
+        return _tmp_df
 
     columns_to_scale = [
         col if col not in df.columns else _get_fixed_column_name(col) for col in columns
@@ -452,23 +457,45 @@ def _apply_scaler(df, columns, reversed=False):
 
     # TODO: split between electric and non electric
     if Column.CONSUPTION_COMBINED_WLTP in columns:
+        karosie = [
+            "SUV",
+            "Kombi",
+            "Schrägheck",
+            "Stufenheck",
+            "Van",
+            "Coupe",
+            "Cabrio",
+            "Hochdach-Kombi",
+            "Geländewagen",
+            "Roadster",
+            "Wohnmobil",
+            "Pick-Up",
+            "Kleintransporter",
+        ]
+        is_car = df[Column.BODY_TYPE].isin(karosie)
         is_electric = df[Column.ENGINE_TYPE] == "Elektro"
-        df_electric = df[is_electric]
-        df_non_electric = df[~is_electric]
+
+        dfs_applied = []
         fixed_col_name = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
         scaled_col_name = _get_fixed_and_scaled_column_name(
             Column.CONSUPTION_COMBINED_WLTP
         )
-        df_electric[scaled_col_name] = __apply_scaler_for_columns(
-            df_electric, [fixed_col_name], [scaled_col_name]
-        )[scaled_col_name].tolist()
-        df_non_electric[scaled_col_name] = __apply_scaler_for_columns(
-            df_non_electric, [fixed_col_name], [scaled_col_name]
-        )[scaled_col_name].tolist()
 
-        tmp_df[scaled_col_name] = pd.concat(
-            [df_electric, df_non_electric]
-        ).sort_index()[scaled_col_name]
+        for filter in (
+            is_car & is_electric,
+            is_car & ~is_electric,
+            ~is_car & is_electric,
+            ~is_car & ~is_electric,
+        ):
+            df_filter = df[filter]
+
+            df_filter[scaled_col_name] = __apply_scaler_for_columns(
+                df_filter, [fixed_col_name], [scaled_col_name]
+            )[scaled_col_name].tolist()
+            if not df_filter.empty:
+                dfs_applied.append(df_filter)
+
+        tmp_df[scaled_col_name] = pd.concat(dfs_applied).sort_index()[scaled_col_name]
 
     return tmp_df
 

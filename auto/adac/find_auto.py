@@ -364,4 +364,4 @@ if __name__ == "__main__":
     adac_path = os.path.join(os.path.dirname(__file__), "adac.csv")
     urls_path = os.path.join(os.path.dirname(__file__), "adac_urls.json")
 
-    find_auto(50000, adac_path, urls_path, override_model_urls=True, parallel=True)
+    find_auto(70000, adac_path, urls_path, override_model_urls=True, parallel=True)

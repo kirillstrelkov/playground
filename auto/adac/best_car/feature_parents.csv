@@ -200,7 +200,7 @@
 "Türanzahl",4,"skip",1
 "3-Punkt-Gurt hinten Mitte",3,"category",1
 "AC-Ladefunktion",3,"skip",1
-"Antriebsart",3,"skip",1
+"Antriebsart",20,"category",1
 "Anzahl Zylinder (Verbrennungsmotor)",3,"skip",1
 "Aufladung (Verbrennungsmotor)",3,"skip",1
 "Einbauposition / Motorbauart (Verbrennungsmotor)",3,"skip",1

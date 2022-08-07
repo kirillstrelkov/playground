@@ -1,12 +1,11 @@
+import os
 from unittest import TestCase
 
-from auto.adac.usedcar.used_car_prices import ADACRelease, _parse_csv_row
-
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import numpy as np
-import matplotlib.pyplot as plt
-import os
+from auto.adac.usedcar.used_car_prices import ADACRelease, _parse_csv_row
 
 
 def assert_in_hash(member, container):
@@ -119,3 +118,12 @@ def test_tesla():
         os.path.join(os.path.dirname(__file__), "data/df_gebrauchtwagenpreise_2019.csv")
     )
     assert df[df["mark"] == "Tesla"].shape[0] == 22
+
+
+def test_2022_golf():
+    assert_model(
+        "Golf 2.0 TDI SCR Comfortline (VII),5,110  (150),V,28600,22950,19900,18750,,,,,,,",
+        {"model": "Golf 2.0 TDI SCR Comfortline (VII)", "kw": 110},
+        {"new": 28600, "2020": 22950, "2019": 19900, "2018": 18750},
+        release=ADACRelease.Y2022,
+    )

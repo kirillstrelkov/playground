@@ -5,7 +5,6 @@ from collections import defaultdict
 import plotly
 from plotly.graph_objs import Layout
 from plotly.graph_objs.graph_objs import Scattergl
-
 from utils.csv import get_row_dict_from_csv, save_dicts
 from utils.file import read_file
 from utils.misc import parse_int

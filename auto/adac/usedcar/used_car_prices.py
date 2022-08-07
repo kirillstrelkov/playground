@@ -1,28 +1,30 @@
+import csv
 import os
 import re
 from collections import defaultdict
 
 import plotly
+from pandas.core.frame import DataFrame
 from plotly.graph_objs import Layout
 from plotly.graph_objs.graph_objs import Scattergl
-
 from utils.file import read_file
 
 # https://www.pdftoexcel.com/
 from utils.misc import parse_int
-from pandas.core.frame import DataFrame
-import csv
 
 
 class ADACRelease(object):
     Y2018 = "2018"
     Y2019 = "2019"
+    Y2022 = "2022"
 
 
 YEARS_HEADER_2018 = ["new"] + "2017 2016 2015 2014 2013 2012 2011".split(" ")
 YEARS_HEADER_2019 = ["new"] + "2018 2017 2016 2015 2014 2013 2012".split(" ")
+YEARS_HEADER_2022 = ["new"] + "2020 2019 2018 2017 2016 2015 2014".split(" ")
 KM_CLASSES_2018 = ["I", "II", "III", "IV", "V", "VI", "VII"]
 KM_CLASSES_2019 = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "X"]
+KM_CLASSES_2022 = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "X"]
 
 
 def _parse_csv_row(cols, release=ADACRelease.Y2018):
@@ -32,6 +34,9 @@ def _parse_csv_row(cols, release=ADACRelease.Y2018):
     elif release == ADACRelease.Y2019:
         YEARS_HEADER = YEARS_HEADER_2019
         KM_CLASSES = KM_CLASSES_2019
+    elif release == ADACRelease.Y2022:
+        YEARS_HEADER = YEARS_HEADER_2022
+        KM_CLASSES = KM_CLASSES_2022
     else:
         assert False, f"Unsupported release: {release}"
     KM_CLASSES.reverse()
@@ -194,6 +199,7 @@ def __main():
     # NOTE: remove all data before and after main table in csv!!!
     save_parsed_adac("gebrauchtwagenpreise_2018.csv", ADACRelease.Y2018)
     save_parsed_adac("gebrauchtwagenpreise_2019.csv", ADACRelease.Y2019)
+    save_parsed_adac("gebrauchtwagenpreise_2022.csv", ADACRelease.Y2022)
 
 
 if __name__ == "__main__":

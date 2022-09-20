@@ -14,13 +14,15 @@ from numpy import dtype, float64, nan
 from pandas.core.frame import DataFrame
 from sklearn.preprocessing import MinMaxScaler
 
+_ZERO_POINT_VALUE = "n.b."
 ZERO_POINTS_MAPPING = {
-    nan,
     "nicht bekannt",
-    "n.b.",
+    nan,
+    _ZERO_POINT_VALUE,
     "Keine",
     "a.W.",
     "Aufpreis (noch nicht bekannt)",
+    "Euro",  # bad data
 }
 NAME_SPLITTER = "|"
 
@@ -84,6 +86,7 @@ Werkstattkosten
 KFZ-Steuer pro Jahr ohne Steuerbefreiung
 Haftpflichtbeitrag 100%
 Vollkaskobetrag 100% 500 € SB
+Reichweite WLTP (elektrisch)
 """.strip().splitlines()
         + [
             Column.COSTS_FIX,
@@ -176,6 +179,7 @@ def _get_mappings(column, values):
         "Antriebsart": ["Allrad", "Heck", "Front"],
         "Getriebeart": [
             "Automatikgetriebe",
+            "Reduktionsgetriebe",
             "Automat. Schaltgetriebe (Doppelkupplung)",
             "CVT-Getriebe",
             "Automatisiertes Schaltgetriebe",
@@ -195,7 +199,12 @@ def _get_mappings(column, values):
                 mappings[val] = new_val
 
         if mappings:
-            mappings["Paket"] = min(mappings.values())
+            mappings["Paket"] = (
+                pd.Series(list(values))
+                .apply(lambda x: _convert_to_float(x))
+                .dropna()
+                .mean()
+            )
             if len(mappings) > 2:
                 max_val, max_second = nlargest(2, mappings.values())
                 max_val = max(mappings.values()) + max_val - max_second
@@ -215,19 +224,21 @@ def _get_mappings(column, values):
 
 
 def _fix_category_columns(df, columns):
+    data = {}
     for col in columns:
         unique_values = df[col].unique()
         mappings = _get_mappings(col, unique_values)
 
         diff_vals = set(unique_values).difference(set(mappings.keys()))
         if diff_vals:
-            logger.warning(
-                f"Failed to create mapping for '{col}': diff: {list(diff_vals)}"
-            )
+            assert (
+                not diff_vals
+            ), f"Failed to create mapping for '{col}': diff: {list(diff_vals)}"
         else:
-            df[_get_fixed_column_name(col)] = df[col].apply(lambda x: mappings[x])
+            new_col = df[col].fillna(_ZERO_POINT_VALUE)
+            data[_get_fixed_column_name(col)] = new_col.apply(lambda x: mappings[x])
 
-    return df
+    return pd.concat([df, pd.DataFrame(data)], axis=1)
 
 
 def _fix_numeric_columns(df, columns=None):
@@ -346,21 +357,21 @@ def _apply_de_discount(df, column):
         netto_price = price * 0.81
         if motor_type == "Elektro":
             if netto_price <= 40000:
-                return 9000
-            elif netto_price <= 65000:
-                return 7500
-        elif motor_type == "PlugIn-Hybrid":
-            if netto_price <= 40000:
                 return 6750
             elif netto_price <= 65000:
-                return 5625
+                return 5250
         return 0
 
     def apply_discount(row):
         motor_type = row[Column.ENGINE_TYPE]
         price = row[_get_fixed_column_name(Column.PRICE)]
+        name = row[Column.NAME]
+        if "Model Y" in name:
+            additional_discount = 2250
+        else:
+            additional_discount = 0
         row[_get_fixed_column_name(column)] = max(
-            0, price - get_discount(price, motor_type)
+            0, price - get_discount(price, motor_type) - additional_discount
         )
         return row
 
@@ -385,7 +396,8 @@ def get_scored_df(df=None, de_discount=False, feature_file_name="feature.csv"):
     df_duplicates = df[df.duplicated([Column.ID])][
         [Column.ID, Column.NAME]
     ].reset_index(drop=True)
-    logger.warning(f"Duplicates:\n{df_duplicates.to_string()}")
+    if not df_duplicates.empty:
+        logger.warning(f"Duplicates:\n{df_duplicates.to_string()}")
     df = df.drop_duplicates([Column.ID]).reset_index(drop=True)
 
     df_features = pd.read_csv(
@@ -457,7 +469,7 @@ def _apply_scaler(df, columns, reversed=False):
 
     # TODO: split between electric and non electric
     if Column.CONSUPTION_COMBINED_WLTP in columns:
-        karosie = [
+        karosie = {
             "SUV",
             "Kombi",
             "Schrägheck",
@@ -471,7 +483,7 @@ def _apply_scaler(df, columns, reversed=False):
             "Wohnmobil",
             "Pick-Up",
             "Kleintransporter",
-        ]
+        }
         is_car = df[Column.BODY_TYPE].isin(karosie)
         is_electric = df[Column.ENGINE_TYPE] == "Elektro"
 
@@ -525,6 +537,10 @@ def _is_weighted(column):
     return "weighted" in column
 
 
+def _is_fixed_and_scaled(column):
+    return "weighted" not in column and "fixed" in column and "scaled" in column
+
+
 def _get_scaled_and_weighted_column_name(column):
     return _get_weighted_column_name(_get_scaled_column_name(column))
 
@@ -540,6 +556,7 @@ def _get_fixed_scaled_and_weighted_column_name(column):
 
 
 def _apply_categorized_scaler(df, columns):
+    df = df.fillna(_ZERO_POINT_VALUE)
     df = _fix_category_columns(df, columns)
 
     df_columns = set(df.columns.tolist())

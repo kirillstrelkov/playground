@@ -15,7 +15,14 @@ def __save_excels(de_discount, feature_path):
     cols = [Column.NAME, Column.PRICE, Column.TOTAL_SCORE, Column.EURO_PER_SCORE]
 
     print(f"Better subaru {feature_path}")
-    subaru = scored_df[scored_df.id == 283761].iloc[0]
+    subaru = (
+        scored_df[scored_df[Column.NAME].str.contains("Subaru Impreza")]
+        .sort_values(
+            [Column.TOTAL_SCORE],
+            ascending=[False],
+        )
+        .iloc[0]
+    )
     best = scored_df[
         (scored_df[Column.TOTAL_SCORE] > subaru[Column.TOTAL_SCORE])
         & (scored_df[Column.EURO_PER_SCORE] < subaru[Column.EURO_PER_SCORE])
@@ -26,7 +33,6 @@ def __save_excels(de_discount, feature_path):
 
     quantile = 0.95
     print(f"Better {quantile * 100}% {feature_path}")
-    subaru = scored_df[scored_df.id == 283761].iloc[0]
     best = scored_df[
         (
             scored_df[Column.TOTAL_SCORE]
@@ -41,6 +47,6 @@ def __save_excels(de_discount, feature_path):
 if __name__ == "__main__":
     for de_discount, feature_path in (
         (True, "feature.csv"),
-        (False, "feature_parents.csv"),
+        # (False, "feature_parents.csv"),
     ):
         __save_excels(de_discount, feature_path)

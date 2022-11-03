@@ -2,7 +2,6 @@ import os
 import re
 from pprint import pprint
 
-from common_utils import browser_decorator
 from easelenium.browser import Browser
 from loguru import logger
 from more_itertools.recipes import flatten
@@ -11,22 +10,28 @@ from selenium.webdriver.common.by import By
 from tqdm import tqdm
 from utils.misc import concurrent_map
 
+from common_utils import browser_decorator
+
 URL = "https://browser.geekbench.com/v5/cpu/search?q="
 
 INTEL_REGEXP = re.compile(r".*i(\d+)-(\d+\w+).*", re.IGNORECASE)
-AMD_REGEXP = re.compile(r".*ryzen (\d+) (\d+\w+).*", re.IGNORECASE)
+AMD_REGEXP = re.compile(r".*ryzen .*? (\d+\w+).*", re.IGNORECASE)
 
 
 def _get_cpu_model(cpu):
     if "amd" in cpu.lower():
         regexp = AMD_REGEXP
+        group_index = 1
     else:
         regexp = INTEL_REGEXP
-    return regexp.match(cpu).group(2)
+        group_index = 2
+    match = regexp.match(cpu)
+    return match.group(group_index) if match else None
 
 
 def _get_cpu_model_as_int(cpu):
-    return int(re.findall(r"\d+", _get_cpu_model(cpu))[0])
+    model = _get_cpu_model(cpu)
+    return int(re.findall(r"\d+", model)[0]) if model else -1
 
 
 class Constant(object):
@@ -86,7 +91,7 @@ def _get_results(url: str, browser: Browser = None):
 
 
 @browser_decorator
-def __prepare_query_data(queries: [], browser: Browser = None):
+def _prepare_query_data(queries: list, browser: Browser = None):
     css_btn_next = (By.CSS_SELECTOR, ".page-link")
 
     data = []
@@ -118,7 +123,7 @@ def __get_geekbench_results(query_data: dict):
 
 
 def __main():
-    ryzen_models = "Ryzen 5 6600U,Ryzen 5 6600H,Ryzen 5 6600HS,Ryzen 7 6800U,Ryzen 7 6800H,Ryzen 7 6800HS,Ryzen 9 6900HS,Ryzen 9 6900HX,Ryzen 9 6980HS,Ryzen 9 6980HX".split(
+    ryzen_models = "Ryzen 5 6600U,Ryzen 5 6600H,Ryzen 5 6600HS,Ryzen 7 6800U,Ryzen 7 6850U,Ryzen 7 6800H,Ryzen 7 6800HS,Ryzen 9 6900HS,Ryzen 9 6900HX,Ryzen 9 6980HS,Ryzen 9 6980HX".split(
         ","
     )
     ryzen_models = [
@@ -132,7 +137,7 @@ def __main():
     ]
 
     models = ryzen_models + intel_models
-    query_data = __prepare_query_data(models)
+    query_data = _prepare_query_data(models)
     pprint(query_data)
 
     data = flatten(concurrent_map(__get_geekbench_results, query_data))

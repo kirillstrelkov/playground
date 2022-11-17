@@ -30,7 +30,7 @@ def test_best_month_day():
     assert not df_jan.empty
     assert (
         df_jan[df_jan[Column.DAY] == 1][Column.PERCENT].mean()
-        < df_jan[df_jan[Column.DAY] == 27][Column.PERCENT].mean()
+        > df_jan[df_jan[Column.DAY] == 27][Column.PERCENT].mean()
     )
 
 
@@ -48,7 +48,7 @@ def test_best_hour():
     assert not df.empty
     assert (
         df[df[Column.HOUR] == 15][Column.PERCENT].mean()
-        < df[df[Column.HOUR] == 13][Column.PERCENT].mean()
+        > df[df[Column.HOUR] == 13][Column.PERCENT].mean()
     )
 
 
@@ -57,7 +57,7 @@ def test_best_15mins():
     assert not df.empty
     assert (
         df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
-        < df[df[Column.QUARTER] == 15][Column.PERCENT].mean()
+        > df[df[Column.QUARTER] == 15][Column.PERCENT].mean()
     )
     assert df[Column.QUARTER].unique() == [0, 15, 30, 45]
 
@@ -67,7 +67,7 @@ def test_best_time_hour_and_minute():
     assert not df.empty
     assert (
         df[df[Column.TIME] == 15.0][Column.PERCENT].mean()
-        < df[df[Column.TIME] == 13.0][Column.PERCENT].mean()
+        > df[df[Column.TIME] == 13.0][Column.PERCENT].mean()
     )
     assert df[Column.MINUTE].unique() == [0, 30]
 
@@ -86,4 +86,4 @@ def test_symbols():
     for _ in range(100):
         symbols = _get_symbols(FILENAME, None)
         assert symbols
-        assert len(symbols) == 160
+        assert len(symbols) == 159

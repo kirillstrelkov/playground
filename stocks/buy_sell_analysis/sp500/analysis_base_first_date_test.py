@@ -31,7 +31,7 @@ def test_best_month_day():
     assert not df_jan.empty
     assert (
         df_jan[df_jan[Column.DAY] == 1][Column.PERCENT].mean()
-        < df_jan[df_jan[Column.DAY] == 31][Column.PERCENT].mean()
+        > df_jan[df_jan[Column.DAY] == 31][Column.PERCENT].mean()
     )
 
 
@@ -62,7 +62,7 @@ def test_best_15mins():
     assert not df.empty
     assert (
         df[df[Column.QUARTER] == 15][Column.PERCENT].mean()
-        < df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
+        > df[df[Column.QUARTER] == 45][Column.PERCENT].mean()
     )
     assert df[Column.QUARTER].unique() == [0, 15, 30, 45]
 

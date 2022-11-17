@@ -1,11 +1,13 @@
 from datetime import datetime
 
 from dateutil.relativedelta import relativedelta
+
 from stocks.buy_sell_analysis import analysis, analysis_base_first_date
 from stocks.buy_sell_analysis.common import (
     YahooRange,
     _format_datetime,
     _get_start_and_end_dates,
+    _get_symbols,
 )
 
 
@@ -26,6 +28,15 @@ def test_get_range_2month():
 
 def test_format_datetime():
     assert _format_datetime(datetime.fromtimestamp(1621007034)) == "2021-05-14"
+
+
+def test_get_symbols():
+    limit = 10000
+    for filename, expected_results in [
+        ("sp500/sp500.csv", 505),
+        ("dax/dax_mdax_sdax.csv", 159),
+    ]:
+        assert len(_get_symbols(filename, limit)) == expected_results
 
 
 def test_cached_df_from_different_modules():

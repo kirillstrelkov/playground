@@ -1,5 +1,7 @@
+import pandas as pd
 from loguru import logger
 from pandas.core.frame import DataFrame
+
 from stocks.buy_sell_analysis.common import (
     Column,
     YahooRange,
@@ -16,7 +18,7 @@ def _get_best_weekday_diffs(df_symbols):
     # if number of working days less than 3 - don't count
     number_of_good_working = 3
 
-    df_weeks = DataFrame(columns=Column.ALL)
+    df_weeks = []
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             df_week = df[(df[Column.YEAR] == year) & (df[Column.WEEK] == week)].copy()
@@ -41,9 +43,9 @@ def _get_best_weekday_diffs(df_symbols):
                 df_week.shape[0] >= number_of_good_working
             ), f"Wrong number of weekdays in dataframe {df_week.shape} for year {year} {week}: {days}"
 
-            df_weeks = df_weeks.append(df_week)
+            df_weeks.append(df_week)
 
-    return df_weeks[
+    return (pd.concat(df_weeks) if df_weeks else DataFrame(columns=Column.ALL))[
         [Column.YEAR, Column.WEEK, Column.WEEKDAY, Column.SYMBOL, Column.PERCENT]
     ]
 
@@ -56,7 +58,7 @@ def _get_monthly_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
-    df_months = DataFrame(columns=Column.ALL)
+    df_months = []
     for year in df[Column.YEAR].unique():
         df_month = df[df[Column.YEAR] == year].copy()
         if df_month.shape[0] < 12:
@@ -72,9 +74,11 @@ def _get_monthly_diffs(df_symbols):
             df_month.shape[0] == 12
         ), f"Wrong number of month in dataframe {df_month.shape} for year {year}"
 
-        df_months = df_months.append(df_month)
+        df_months.append(df_month)
 
-    return df_months[[Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]]
+    return (pd.concat(df_months) if df_months else DataFrame(columns=Column.ALL))[
+        [Column.YEAR, Column.MONTH, Column.SYMBOL, Column.PERCENT]
+    ]
 
 
 def get_best_month(filename: str, yahoo_range: YahooRange, limit=None):
@@ -88,7 +92,7 @@ def _get_month_day_diffs(df_symbols):
     if df.empty:
         return df
 
-    df_months = DataFrame(columns=Column.ALL)
+    df_months = []
     for year in df[Column.YEAR].unique():
         for month in df[Column.MONTH].unique():
             df_month = df[
@@ -104,11 +108,11 @@ def _get_month_day_diffs(df_symbols):
             if (
                 df_month.shape[0] >= 28 - 10
             ):  # 28 days in shortest Feb, 10 days - weeknds max
-                df_months = df_months.append(df_month)
+                df_months.append(df_month)
             else:
                 logger.debug(f"Not enough data for {symbol} in {year}.{month}")
 
-    return df_months[
+    return (pd.concat(df_months) if df_months else DataFrame(columns=Column.ALL))[
         [Column.YEAR, Column.MONTH, Column.DAY, Column.SYMBOL, Column.PERCENT]
     ]
 
@@ -126,7 +130,7 @@ def _get_hour_diffs(df_symbols):
     hours = df[Column.HOUR].unique()
     assert hours.shape[0] > 5, f"Wrong data for {symbol} {hours}"
 
-    df_days = DataFrame(columns=Column.ALL)
+    df_days = []
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -143,11 +147,11 @@ def _get_hour_diffs(df_symbols):
                     / df_day[df_day[Column.HOUR] == first_hour].iloc[0][Column.OPEN]
                 )
                 if df_day.shape[0] >= 5:  # good data is at least 5 hours per day
-                    df_days = df_days.append(df_day)
+                    df_days.append(df_day)
                 else:
                     logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
-    return df_days[
+    return (pd.concat(df_days) if df_days else DataFrame(columns=Column.ALL))[
         [
             Column.YEAR,
             Column.WEEK,
@@ -178,7 +182,7 @@ def _get_quarter_diffs(df_symbols):
     minutes = df[Column.MINUTE].unique()
     assert minutes.shape[0] > 3, f"Wrong data for {symbol} {minutes}"
 
-    df_days = DataFrame(columns=Column.ALL)
+    df_days = []
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -201,10 +205,11 @@ def _get_quarter_diffs(df_symbols):
                     if (
                         df_hour.shape[0] >= 2
                     ):  # good data is at least 2 times per hour (9:30, 9:45)
-                        df_days = df_days.append(df_hour)
+                        df_days.append(df_hour)
                     else:
                         logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
+    df_days = pd.concat(df_days) if df_days else DataFrame(columns=Column.ALL)
     df_days = df_days[df_days[Column.MINUTE].isin(range(0, 60, 15))]
     df_days[Column.QUARTER] = df_days[Column.MINUTE]
     return df_days[
@@ -243,7 +248,7 @@ def _get_time_diffs(df_symbols):
 
     df[Column.TIME] = df.apply(lambda x: x[Column.HOUR] + x[Column.MINUTE] / 60, axis=1)
 
-    df_days = DataFrame(columns=Column.ALL)
+    df_days = []
     for year in df[Column.YEAR].unique():
         for week in df[Column.WEEK].unique():
             for day in df[Column.DAY].unique():
@@ -262,10 +267,11 @@ def _get_time_diffs(df_symbols):
                 if (
                     df_hour.shape[0] >= 2
                 ):  # good data is at least 2 times per hour (9:00, 9:30)
-                    df_days = df_days.append(df_hour)
+                    df_days.append(df_hour)
                 else:
                     logger.debug(f"Not enough data for {symbol} in {week} {day}")
 
+    df_days = pd.concat(df_days) if df_days else DataFrame(columns=Column.ALL)
     df_days = df_days[df_days[Column.MINUTE].isin([0, 30])]
 
     return df_days[
@@ -297,7 +303,7 @@ def _get_week_diffs(df_symbols):
     symbol = df_symbols[Column.SYMBOL]
     df = update_dataframe(df_symbols[Column.HISTORY], symbol)
 
-    df_months = DataFrame(columns=Column.ALL)
+    df_months = []
     for year in df[Column.YEAR].unique():
         df_month = df[df[Column.YEAR] == year].copy()
         if df_month.shape[0] < 50:
@@ -313,9 +319,11 @@ def _get_week_diffs(df_symbols):
             df_month.shape[0] >= 50
         ), f"Wrong number of month in dataframe {df_month.shape} for year {year}"
 
-        df_months = df_months.append(df_month)
+        df_months.append(df_month)
 
-    return df_months[[Column.YEAR, Column.WEEK, Column.SYMBOL, Column.PERCENT]]
+    return (pd.concat(df_months) if df_months else DataFrame(columns=Column.ALL))[
+        [Column.YEAR, Column.WEEK, Column.SYMBOL, Column.PERCENT]
+    ]
 
 
 def get_best_week(filename: str, yahoo_range: YahooRange, limit=None):
@@ -333,7 +341,7 @@ def _get_year_day_diffs(df_symbols):
     df = update_dataframe(df_symbols[Column.HISTORY], symbol)
     date_column_name = get_date_column_name(df)
 
-    df_years = DataFrame(columns=df.columns)
+    df_years = []
     for year in df[Column.YEAR].unique():
         df_year = df[df[Column.YEAR] == year].copy()
         if df_year.shape[0] < 150:
@@ -349,9 +357,9 @@ def _get_year_day_diffs(df_symbols):
             df_year.shape[0] > 150
         ), f"Wrong data in dataframe {df_year.shape} for year {year}"
 
-        df_years = df_years.append(df_year)
+        df_years.append(df_year)
 
-    return df_years[
+    return (pd.concat(df_years) if df_years else DataFrame(columns=Column.ALL))[
         [
             date_column_name,
             Column.YEAR,

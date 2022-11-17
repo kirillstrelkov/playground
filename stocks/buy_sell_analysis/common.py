@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
-from caching_utils import get_cached_value, get_hashsum
 from loguru import logger
 from matplotlib import pyplot
 from seaborn import barplot, boxplot, lineplot, scatterplot
 from utils.misc import concurrent_map
+
+from caching_utils import get_cached_value, get_hashsum
 
 
 class YahooRange(IntEnum):
@@ -122,8 +123,10 @@ def update_dataframe(df, symbol, set_base_value=False):
 
     df[Column.DAY_NAME] = df_date.apply(lambda x: x.day_name())
     df[Column.MONTH_NAME] = df_date.apply(lambda x: x.month_name())
-    df[Column.WEEKDAY] = df_date.apply(lambda x: x.weekday())
-    df[Column.WEEK] = df_date.apply(lambda x: x.isocalendar()[1])
+
+    # DateTimeIndex as x for some data??
+    df[Column.WEEKDAY] = [t.weekday() for t in df_date.tolist()]
+    df[Column.WEEK] = [t.isocalendar()[1] for t in df_date.tolist()]
 
     # Filteting NA in Open - this means usually a dividends
     if not df.empty:
@@ -142,7 +145,7 @@ def update_dataframe(df, symbol, set_base_value=False):
 
 def __get_symbol(isin):
     url = f"https://query2.finance.yahoo.com/v1/finance/search?q={isin}&quotesCount=1&newsCount=0"
-    r = requests.get(url)
+    r = requests.get(url, headers={"User-agent": "Mozilla/5.0"})
     if r.status_code == 200:
         quotes = r.json().get("quotes")
         if quotes:
@@ -193,12 +196,23 @@ def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str =
         symbols = _get_symbols(filename, limit)
 
         history_data = get_history(symbols, start_date, end_date, interval)
-        symbols_with_history = [
-            {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
-            for symbol in history_data.columns.get_level_values(0).unique().to_list()
-            if not history_data.empty
-            and not history_data[history_data[symbol][Column.OPEN].notna()].empty
-        ]
+        if len(set(symbols)) == 1:
+            symbols_with_history = [
+                {Column.SYMBOL: symbols[0], Column.HISTORY: history_data}
+            ]
+        else:
+            symbols_with_history = [
+                {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
+                for symbol in history_data.columns.get_level_values(0)
+                .unique()
+                .to_list()
+                if (
+                    not history_data.empty
+                    and not history_data[
+                        history_data[symbol][Column.OPEN].notna()
+                    ].empty
+                )
+            ]
 
         dfs = [df for df in concurrent_map(func, symbols_with_history) if not df.empty]
         if dfs:
@@ -213,8 +227,18 @@ def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str =
             symbols_dfs = pd.DataFrame()
         return symbols_dfs
 
-    symbols_dfs = _get_cached_value(
-        _get_hashsum(
+    hashsum = _get_hashsum(
+        wrapper.__name__,
+        func.__module__,
+        func.__name__,
+        filename,
+        yahoo_range,
+        limit,
+        interval,
+    )
+    logger.debug(
+        "Hashsum for {}: {}",
+        (
             wrapper.__name__,
             func.__module__,
             func.__name__,
@@ -223,6 +247,10 @@ def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str =
             limit,
             interval,
         ),
+        hashsum,
+    )
+    symbols_dfs = _get_cached_value(
+        hashsum,
         __get_symbols_nested,
     )
 
@@ -254,26 +282,31 @@ def plot(**kwargs):
 
         ax = func(**kwargs, ax=ax)
         if func == barplot:
-            y_mean = Y.mean()
-            ax.set_ylim(y_mean * 0.8, y_mean * 1.2)
+            y_q2 = Y.quantile(0.93)
+            y_q1 = Y.quantile(0.10)
+            ax.set_ylim(y_q1, y_q2)
 
     fig.tight_layout()
 
 
 def _get_start_and_end_dates(range_type: YahooRange):
     current_date = datetime.now()
-    if range_type in (YahooRange.YEARS_10, YahooRange.YEARS_2, YahooRange.YEARS_20):
+    if range_type in (YahooRange.YEARS_10, YahooRange.YEARS_20):
         year = current_date.year
         end_date = datetime(year, 1, 1)
 
         if range_type == YahooRange.YEARS_10:
             year -= 10
-        elif range_type == YahooRange.YEARS_2:
-            year -= 2
         elif range_type == YahooRange.YEARS_20:
             year -= 20
-
         start_date = datetime(year, 1, 1)
+    elif range_type == YahooRange.YEARS_2:
+        # to be sure that range is within "last" 730 days
+        start_date = datetime(
+            current_date.year - 2, current_date.month, current_date.day
+        ) + timedelta(days=2)
+        # yesterday
+        end_date = current_date - timedelta(days=1)
     elif range_type == YahooRange.DAYS_58:
         end_date = current_date - timedelta(days=1)
         start_date = end_date - timedelta(days=58)

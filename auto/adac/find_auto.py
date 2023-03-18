@@ -2,13 +2,13 @@
 import json
 import os
 import re
+import time
 from datetime import datetime
 from hashlib import md5
 from time import sleep
 
 import numpy as np
 import pandas as pd
-from common_utils import browser_decorator
 from easelenium.browser import Browser
 from loguru import logger
 from selenium.webdriver.common.by import By
@@ -16,12 +16,14 @@ from tqdm import tqdm
 from utils.lists import flatten
 from utils.misc import concurrent_map, tqdm_concurrent_map
 
+from common_utils import browser_decorator
+
 TIMEOUT_WAIT_FOR = 15
 
 DAYS_TO_EXPIRE = 5
 RANGE_5 = range(0, 5)
 
-ID_ACCEPT_COOKIES = (By.ID, "uc-btn-accept-banner")
+ID_ACCEPT_COOKIES = (By.ID, "cmpwrapper")
 ID_LOADING_IMAGE = (By.ID, "progressImage")
 ID_OVERLAY = (By.ID, "overlay")
 ID_PRICE_BOX_MIN = (By.CSS_SELECTOR, "[id*=Preis] .box-min")
@@ -49,12 +51,13 @@ def fix_german_number(text):
     return text.replace(".", "").replace(",", ".")
 
 
-def get_number(text):
-    return int(re.findall(r"\d+", str(text))[0])
-
-
 def _get_m_url(data):
     return get_model_urls(data["price"], min_price=data.get("min_price"))
+
+
+def _open_url(browser, url):
+    browser.get(url)
+    __accept_cookies(browser)
 
 
 def __get_url_with_queries(
@@ -68,78 +71,91 @@ def __get_url_with_queries(
     if new_cars_only:
         url += "?newCarsOnly=true"
 
-    browser.get(url)
-
-    __accept_cookies(browser)
+    _open_url(browser, url)
 
     # add price to url
     browser.click(by_css="[for='basePrice']")
-    price_elements = browser.find_elements(
-        by_css="#basePrice-container input[name='basePrice']"
-    )
 
-    min_supported_price = int(fix_german_number(browser.get_value(price_elements[0])))
-    max_supported_price = int(fix_german_number(browser.get_value(price_elements[1])))
+    min_supported_price = int(
+        fix_german_number(
+            browser.get_value(by_css="#basePrice-container input[name='basePrice']")
+        )
+    )
+    max_supported_price = int(
+        fix_german_number(
+            browser.get_value(by_css="#basePrice-secondary-container input")
+        )
+    )
     assert min_supported_price <= min_price
     assert max_supported_price >= price
     url += f"&basePrice.min={min_price}&basePrice.max={price}"
 
     # add mark to url
-    browser.get(url)
+    _open_url(browser, url)
     if mark:
         browser.type(by_id="brand-input", text=mark)
         browser.click(by_css="#brand-suggestions > li")
         btn_search = "//main//button[contains(text(), 'anzeigen')]"
         browser.click(by_xpath=btn_search)
         browser.wait_for_visible(by_xpath=btn_search)
-        # NOTE: might fail because of loading
 
     return browser.get_current_url()
 
 
 @browser_decorator
 def get_model_urls(
-    price,
+    price=None,
     min_price=1000,
     mark=None,
     new_cars_only=True,
+    url=None,
     browser=None,
 ):
-    log_postfix = f" with price: {min_price} - {price}"
-    logger.debug(f"Processing {log_postfix}")
-    url = __get_url_with_queries(browser, price, min_price, mark, new_cars_only)
+    log_postfix = ""
+    if not url:
+        log_postfix = f" with price: {min_price} - {price}"
+        logger.debug(f"Processing {log_postfix}")
+        url = __get_url_with_queries(browser, price, min_price, mark, new_cars_only)
+    else:
+        _open_url(browser, url)
+
     logger.debug(f"Processing {url}")
 
-    # find all cars/trim level
+    css_model_link = "tbody a"
+    max_page = max(
+        [1]
+        + [
+            int(e.text)
+            for e in browser.find_elements(by_css='[data-testid="pagination"] a')
+            if e.text
+        ]
+    )
+
     model_urls = []
+    for page_index in range(1, max_page + 1):
+        _open_url(browser, f"{url}&pageNumber={page_index}")
+        if max_page > 1:
+            browser.wait_for_present(by_css=css_model_link)
+        else:
+            sleep(1)
 
-    model_href = "//main//a[contains(@href, 'autokatalog')]"
-
-    load_more = "//button[text()='Weitere Ergebnisse']"
-    while browser.is_visible(by_xpath=load_more):
-        models_count = len(browser.find_elements(by_xpath=model_href))
-        browser.click(by_xpath=load_more)
-        browser.webdriver_wait(
-            lambda driver: models_count
-            < len(browser.find_elements(by_xpath=model_href)),
-            timeout=10,
-        )
-
-    model_urls = [
-        e.get_attribute("href") for e in browser.find_elements(by_xpath=model_href)
-    ]
-
-    # first is skipped because it is a search button
-    model_urls = model_urls[1:]
+        model_urls += [
+            e.get_attribute("href")
+            for e in browser.find_elements(by_css=css_model_link)
+        ]
 
     logger.debug(f"Found {len(model_urls)} " + log_postfix)
     return model_urls
 
 
 def __accept_cookies(browser):
-    browser.wait_for_visible(ID_ACCEPT_COOKIES)
-    browser.click(ID_ACCEPT_COOKIES)
-    browser.wait_for_not_visible(ID_ACCEPT_COOKIES)
+    browser.wait_for_present(ID_ACCEPT_COOKIES)
+    # remove content
+    browser.execute_js(
+        f"return document.getElementById('{ID_ACCEPT_COOKIES[1]}').remove();"
+    )
+    # browser.click(ID_ACCEPT_COOKIES)
+    browser.wait_for_not_present(ID_ACCEPT_COOKIES)
 
 
 def __get_cost_data(browser):
@@ -150,13 +166,18 @@ def __get_cost_data(browser):
 
     browser.click(css_tab)
 
-    cells = [browser.get_text(e) for e in browser.find_elements(by_css="td")]
+    cells = [
+        browser.get_text(e)
+        for e in browser.find_elements(by_css="[title='Laufende Kosten'] td")
+    ]
     data = dict(zip(cells[::2], cells[1::2]))
 
-    css_additional = (By.CSS_SELECTOR, "main div > p")
+    css_additional = (By.CSS_SELECTOR, "[title='Laufende Kosten'] main div > p")
     additional = [browser.get_text(p) for p in browser.find_elements(css_additional)]
     data.update(dict(zip(additional[::2], additional[1::2])))
-    data["Kosten"] = browser.get_text((By.CSS_SELECTOR, "thead > tr"))
+    data["Kosten"] = browser.get_text(
+        (By.CSS_SELECTOR, "[title='Laufende Kosten'] thead > tr")
+    )
 
     return data
 
@@ -166,23 +187,26 @@ def __get_tech_data(browser):
 
     browser.click(css_tab_tech)
 
-    cells = [browser.get_text(e) for e in browser.find_elements(by_css="td")]
+    cells = [
+        browser.get_text(e)
+        for e in browser.find_elements(by_css="[title='Technische Daten'] td")
+    ]
     data = dict(zip(cells[::2], cells[1::2]))
 
-    data["image"] = browser.get_attribute(
-        by_css="main div picture img",
-        attr="src",
+    text = browser.get_attribute(
+        by_css="[title='Technische Daten'] main div picture source",
+        attr="srcset",
     )
+    matches = re.findall("http.*?.jpg", text)
+    data["image"] = matches[-1] if matches else None
 
     return data
 
 
 @browser_decorator
 def get_adac_data(url, browser=None):
-    browser.get(url)
+    _open_url(browser, url)
     url = browser.get_current_url()
-
-    __accept_cookies(browser)
 
     model_data = {
         "name": re.sub(r"\s+", " ", browser.get_text(by_css="div h1")),
@@ -265,7 +289,7 @@ def __save_iteratively(urls, path):
 
         __save_models_and_trims(pd.DataFrame([adac_data]), path)
 
-    return pd.read_csv(path)
+    return pd.read_csv(path) if urls else pd.DataFrame()
 
 
 def __process_trim_url(data):
@@ -290,8 +314,9 @@ def __process_trim_url(data):
 
     try:
         adac_data = get_adac_data(url)
-    except:
-        logger.warning(f"Failed to get data from {url}")
+    except Exception as e:
+        logger.error(f"Failed to get data from {url}")
+        logger.exception(e)
         adac_data = None
 
     if adac_data is None:
@@ -336,18 +361,16 @@ def find_auto(price, output_path, json_path, override_model_urls=False, parallel
             {"price": prices[i], "min_price": prices[i - 1]}
             for i in range(1, len(prices))
         ]
-        urls = flatten(
-            concurrent_map(
-                _get_m_url,
-                chunks,
+        if parallel:
+            urls = flatten(
+                concurrent_map(
+                    _get_m_url,
+                    chunks,
+                )
             )
-        )
+        else:
+            urls = flatten([_get_m_url(chunk) for chunk in chunks])
         with open(json_path, mode="w") as f:
-            # Add my Subaru
-            # TODO: fix Wertverlust, ADAC - Klassenübliche Ausstattung
-            urls.append(
-                "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/subaru/impreza/v/283761/"
-            )
             json.dump(urls, f)
 
     logger.info("Total models with different trim levels: {}".format(len(urls)))
@@ -364,4 +387,4 @@ if __name__ == "__main__":
     adac_path = os.path.join(os.path.dirname(__file__), "adac.csv")
     urls_path = os.path.join(os.path.dirname(__file__), "adac_urls.json")
 
-    find_auto(70000, adac_path, urls_path, override_model_urls=True, parallel=True)
+    find_auto(65000, adac_path, urls_path, override_model_urls=True, parallel=True)

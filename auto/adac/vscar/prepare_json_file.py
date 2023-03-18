@@ -34,6 +34,7 @@ def __main():
         "price",
         "power",
         "transmission",
+        "image",
     ]
     additional_attributes = [
         c for c in df.columns.to_list() if c not in main_attributes

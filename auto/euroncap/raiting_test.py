@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+
 from auto.euroncap.raiting import (
     Constant,
     get_data,
@@ -23,20 +24,23 @@ def test_get_points_and_percentage(text: str, result: Any):
 
 
 def test_single_car_2022():
-    url = "https://www.euroncap.com/en/results/tesla/model+y/46618"
+    url = "https://www.euroncap.com/en/results/smart/#1/48000"
     data = get_raiting(url)
-    assert data[get_points_key(Constant.ADULT)] == 36.9
-    assert data[get_percent_key(Constant.ADULT)] == 97
-    assert data[get_points_key(Constant.CHILD)] == 43
-    assert data[get_percent_key(Constant.CHILD)] == 87
-    assert data[get_points_key(Constant.ROAD_USERS)] == 44.8
-    assert data[get_percent_key(Constant.ROAD_USERS)] == 82
-    assert data[get_points_key(Constant.ASSIST)] == 15.7
-    assert data[get_percent_key(Constant.ASSIST)] == 98
-    assert data[Constant.TOTAL_POINTS] == 140.4
+    assert data[get_points_key(Constant.ADULT)] == 36.6
+    assert data[get_percent_key(Constant.ADULT)] == 96
+    assert data[get_points_key(Constant.CHILD)] == 43.8
+    assert data[get_percent_key(Constant.CHILD)] == 89
+    assert data[get_points_key(Constant.ROAD_USERS)] == 38.9
+    assert data[get_percent_key(Constant.ROAD_USERS)] == 71
+    assert data[get_points_key(Constant.ASSIST)] == 14.1
+    assert data[get_percent_key(Constant.ASSIST)] == 88
+    assert data[Constant.TOTAL_POINTS] == 133.4
+    assert data[Constant.NAME] == "smart #1"
+    assert data[Constant.ID] == 48000
+    assert data[Constant.YEAR] == 2022
 
 
-def test_single_car_2021():
+def test_single_car_2017():
     url = "https://www.euroncap.com/en/results/subaru/impreza/29084"
     data = get_raiting(url)
     assert data[get_points_key(Constant.ADULT)] == 35.8
@@ -48,6 +52,33 @@ def test_single_car_2021():
     assert data[get_points_key(Constant.ASSIST)] == 8.3
     assert data[get_percent_key(Constant.ASSIST)] == 68
     assert data[Constant.TOTAL_POINTS] == 122.7
+    assert data[Constant.NAME] == "Subaru Impreza"
+    assert data[Constant.ID] == 29084
+    assert data[Constant.YEAR] == 2017
+
+
+@pytest.mark.parametrize(
+    "name,stars",
+    [
+        ("impreza", 5),
+        ("408", 4),
+        ("i10", 3),
+        ("logan", 2),
+        ("jogger", 1),
+        ("zoe", 0),
+    ],
+)
+def test_stars(name, stars):
+    urls = {
+        "impreza": "https://www.euroncap.com/en/results/subaru/impreza/29084",
+        "408": "https://www.euroncap.com/en/results/peugeot/408/48757",
+        "i10": "https://www.euroncap.com/en/results/hyundai/i10/41393",
+        "logan": "https://www.euroncap.com/en/results/dacia/logan/42505",
+        "jogger": "https://www.euroncap.com/en/results/dacia/jogger/45231",
+        "zoe": "https://www.euroncap.com/en/results/renault/zoe/44206",
+    }
+    data = get_raiting(urls[name])
+    assert data[Constant.STARS] == stars
 
 
 def test_get_data():

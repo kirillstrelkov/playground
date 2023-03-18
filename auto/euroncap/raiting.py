@@ -1,11 +1,13 @@
 import re
 from typing import Optional
+from urllib.parse import quote
 
-from common_utils import browser_decorator
 from easelenium.browser import Browser
 from pandas import DataFrame
 from tqdm import tqdm
 from utils.misc import concurrent_map, tqdm_concurrent_map
+
+from common_utils import browser_decorator, get_number, get_numbers
 
 
 class Constant:
@@ -17,6 +19,10 @@ class Constant:
     PERCENTAGE = "percentage"
     TOTAL_POINTS = "total_points"
     URL = "URL"
+    NAME = "name"
+    STARS = "stars"
+    ID = "id"
+    YEAR = "YEAR"
 
 
 RAITINGS = [Constant.ADULT, Constant.CHILD, Constant.ROAD_USERS, Constant.ASSIST]
@@ -36,6 +42,11 @@ def get_points_and_percentage(text: str):
 
 @browser_decorator
 def get_raiting(url: str, browser: Browser = None):
+    # hash is not supported in "https://www.euroncap.com/en/results/smart/#1/48000"
+    splitter = "results"
+    parts = url.split(splitter)
+    parts[-1] = quote(parts[-1])
+    url = splitter.join(parts)
     browser.open(url)
 
     texts = [
@@ -54,13 +65,20 @@ def get_raiting(url: str, browser: Browser = None):
 
     data[Constant.TOTAL_POINTS] = sum([data[get_points_key(r)] for r in RAITINGS])
     data[Constant.URL] = url
+    data[Constant.NAME] = browser.get_text(by_css="h1.car-name")
+    data[Constant.STARS] = get_number(
+        browser.get_attribute(by_css="div.stars img", attr="src")
+    )
+    data[Constant.ID] = get_numbers(url)[-1]
+    data[Constant.YEAR] = get_number(browser.get_text(by_css=".introduction .year"))
 
     return data
 
 
 @browser_decorator
 def _get_urls(browser: Browser = None, name: Optional[str] = None):
-    url = "https://www.euroncap.com/en/ratings-rewards/latest-safety-ratings/#?selectedMake=0&selectedMakeName=Select%20a%20make&selectedModel=0&selectedStar=&includeFullSafetyPackage=true&includeStandardSafetyPackage=true&selectedModelName=All&selectedProtocols=45155,41776,40302,34803,30636,26061&selectedClasses=1202,1199,1201,1196,1205,1203,1198,1179,40250,1197,1204,1180,34736,44997&allClasses=true&allProtocols=false&allDriverAssistanceTechnologies=false&selectedDriverAssistanceTechnologies=&thirdRowFitment=false"
+    # URL contains 2017 - ...
+    url = "https://www.euroncap.com/en/ratings-rewards/latest-safety-ratings/#?selectedMake=0&selectedMakeName=Select%20a%20make&selectedModel=0&selectedStar=&includeFullSafetyPackage=true&includeStandardSafetyPackage=true&selectedModelName=All&selectedProtocols=49446,45155,41776,40302,34803,30636,26061&selectedClasses=1202,1199,1201,1196,1205,1203,1198,1179,40250,1197,1204,1180,34736,44997&allClasses=true&allProtocols=false&allDriverAssistanceTechnologies=false&selectedDriverAssistanceTechnologies=&thirdRowFitment=false"
     browser.get(url)
     css_links = ".rating-table-body a"
     browser.wait_for_visible(by_css=css_links)
@@ -73,7 +91,7 @@ def _get_urls(browser: Browser = None, name: Optional[str] = None):
         )
     )
     if name:
-        urls = [url for url in urls if "impreza" in url]
+        urls = [url for url in urls if name in url]
 
     return urls
 
@@ -86,7 +104,9 @@ def get_data(name: Optional[str] = None, progess: bool = False):
 
 
 if __name__ == "__main__":
-    df = DataFrame(get_data(progess=True)).sort_values(
-        [Constant.TOTAL_POINTS], ascending=False
+    df = (
+        DataFrame(get_data(progess=True))
+        .drop_duplicates([Constant.ID])
+        .sort_values([Constant.TOTAL_POINTS], ascending=False)
     )
     df.to_excel("/tmp/euroncap.xlsx")

@@ -1,5 +1,7 @@
 import pandas as pd
 import pytest
+from numpy import nan
+
 from auto.adac.best_car.adac_test import FEATURES_PATH
 from auto.adac.best_car.find_best_car import (
     NAME_SPLITTER,
@@ -23,7 +25,6 @@ from auto.adac.best_car.utils import (
     COLUMN_FEATURE_WEIGHT,
     FeatureType,
 )
-from numpy import nan
 
 __SUBARU_MY_IMPREZA_NAME = "Subaru Impreza"
 __TESLA_M3_NAME = "Tesla Model 3"
@@ -116,6 +117,13 @@ def test_scaled_columns_minmax(df_scored_de_discount_minmax_scaler):
         assert df[col].max() <= 1.01
 
 
+def test_fixed_columens(df_scored_de_discount_minmax_scaler):
+    assert (
+        _get_fixed_column_name(Column.COSTS)
+        in df_scored_de_discount_minmax_scaler.columns
+    )
+
+
 def test_max_weights(df_scored_de_discount_minmax_scaler, df_features):
     df = df_scored_de_discount_minmax_scaler
     for _, row in df_features.iterrows():
@@ -132,16 +140,49 @@ def test_consumption(
 ):
     col_fixed = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
     col_scaled = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
+    col_weighted = _get_fixed_scaled_and_weighted_column_name(
+        Column.CONSUPTION_COMBINED_WLTP
+    )
     df_e = df_scored_de_discount_minmax_scaler[
         df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] == "Elektro"
     ]
     df_non_e = df_scored_de_discount_minmax_scaler[
         df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] != "Elektro"
     ]
+    cols = [
+        "name",
+        Column.CONSUPTION_COMBINED_WLTP,
+        col_fixed,
+        col_scaled,
+        col_weighted,
+    ]
+    df_e_min = df_e[df_e[col_fixed] == df_e[col_fixed].min()][cols].iloc[0]
+    df_e_max = df_e[df_e[col_fixed] == df_e[col_fixed].max()][cols].iloc[0]
+    assert df_e_min[col_scaled] == 1.0
+    assert df_e_max[col_scaled] < 0.01
+
+    df_non_e_min = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].min()][
+        cols
+    ].iloc[0]
+    df_non_e_max = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].max()][
+        cols
+    ].iloc[0]
+    assert df_non_e_min[col_scaled] == 1.0
+    assert df_non_e_max[col_scaled] < 0.01
+
+    e_fixed_min = df_e[col_fixed].min()
+    e_fixed_max = df_e[col_fixed].max()
+    assert 3 < e_fixed_min < 6
+    assert 30 < e_fixed_max < 35
 
     e_scaled_min = df_e[col_scaled].min()
     e_scaled_mean = df_e[col_scaled].mean()
     e_scaled_max = df_e[col_scaled].max()
+
+    non_e_fixed_min = df_non_e[col_fixed].min()
+    non_e_fixed_max = df_non_e[col_fixed].max()
+    assert 1 < non_e_fixed_min < 3
+    assert 10 < non_e_fixed_max < 15
 
     non_e_scaled_min = df_non_e[col_scaled].min()
     non_e_scaled_mean = df_non_e[col_scaled].mean()
@@ -163,12 +204,17 @@ def test_consumption(
     subaru = _get_car_by_name(
         df_scored_de_discount_minmax_scaler, __SUBARU_MY_IMPREZA_NAME
     )
+    df_tesla = tesla[cols]
+    df_subaru = subaru[cols]
+
     assert tesla[col_fixed] < df_e[col_fixed].mean()
     assert tesla[col_scaled] > e_scaled_mean
 
     assert subaru[col_fixed] > df_non_e[col_fixed].mean()
     assert subaru[col_scaled] < 0.5
     assert subaru[col_scaled] < non_e_scaled_mean
+
+    assert df_tesla[col_weighted] > df_subaru[col_weighted]
 
 
 def test_tesla_scaled_consumption_better_than_subaru(

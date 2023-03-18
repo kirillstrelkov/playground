@@ -1,4 +1,5 @@
 import seaborn as sns
+
 from auto.adac.best_car.find_best_car import Column, get_scored_df
 
 
@@ -46,7 +47,7 @@ def __save_excels(de_discount, feature_path):
 
 if __name__ == "__main__":
     for de_discount, feature_path in (
-        (True, "feature.csv"),
-        # (False, "feature_parents.csv"),
+        # (True, "feature.csv"),
+        (False, "feature_parents.csv"),
     ):
         __save_excels(de_discount, feature_path)

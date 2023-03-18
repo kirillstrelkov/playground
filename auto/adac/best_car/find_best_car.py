@@ -3,16 +3,17 @@ import re
 from heapq import nlargest
 
 import pandas as pd
+from loguru import logger
+from numpy import dtype, float64, nan
+from pandas.core.frame import DataFrame
+from sklearn.preprocessing import MinMaxScaler
+
 from auto.adac.best_car.utils import (
     COLUMN_FEATURE,
     COLUMN_FEATURE_TYPE,
     COLUMN_FEATURE_WEIGHT,
     FeatureType,
 )
-from loguru import logger
-from numpy import dtype, float64, nan
-from pandas.core.frame import DataFrame
-from sklearn.preprocessing import MinMaxScaler
 
 _ZERO_POINT_VALUE = "n.b."
 ZERO_POINTS_MAPPING = {
@@ -34,6 +35,7 @@ class Column(object):
     COSTS_OPERATING = "Betriebskosten"
     COSTS_FIX = "Fixkosten"
     COSTS_WORKSHOP = "Werkstattkosten"
+    COSTS = "Kosten"
     COSTS_DEPRECIATION = "Wertverlust"
     MARK = "Marke"
     SERIE = "Baureihe"
@@ -46,6 +48,7 @@ class Column(object):
     BATTERY_CAPACITY = "Batteriekapazität (Netto) in kWh"
     CONSUPTION_TOTAL_NEFZ = "Verbrauch Gesamt (NEFZ)"
     CONSUPTION_COMBINED_WLTP = "Verbrauch kombiniert (WLTP)"
+    CONSUPTION_2_COMBINED_WLTP = "Verbrauch kombiniert (WLTP) - 2. Antrieb"
     BODY_TYPE = "Karosserie"
     TOP_SPEED = "Höchstgeschwindigkeit"
     # New columns:
@@ -83,6 +86,7 @@ Wertverlust
 Betriebskosten
 Fixkosten
 Werkstattkosten
+Kosten
 KFZ-Steuer pro Jahr ohne Steuerbefreiung
 Haftpflichtbeitrag 100%
 Vollkaskobetrag 100% 500 € SB
@@ -176,7 +180,7 @@ def _get_mappings(column, values):
         "Federung hinten": ["Luft", "Drehstab", "Schraube", "Blattfeder"],
         "Bremse hinten": ["Scheibe", "Trommel"],
         "Federung vorne": ["Luft", "Blattfeder", "Schraube"],
-        "Antriebsart": ["Allrad", "Heck", "Front"],
+        "Antriebsart": ["Allrad", "Hinterrad", "Vorderrad"],
         "Getriebeart": [
             "Automatikgetriebe",
             "Reduktionsgetriebe",
@@ -242,6 +246,18 @@ def _fix_category_columns(df, columns):
 
 
 def _fix_numeric_columns(df, columns=None):
+    def _conver_consumption(row):
+        consumption1 = row.get(Column.CONSUPTION_COMBINED_WLTP, nan)
+        consumption2 = row.get(Column.CONSUPTION_2_COMBINED_WLTP, nan)
+        is_plugin = row[Column.ENGINE_TYPE] == "PlugIn-Hybrid"
+        if is_plugin:
+            consumption = consumption1
+            if "kwh/" in str(consumption1).lower():
+                consumption = consumption2
+            return _convert_to_float(consumption) * 4
+        else:
+            return _convert_to_float(consumption1)
+
     if not columns:
         columns = Constant.COLS_WITH_NUMERIC_DATA
 
@@ -250,8 +266,7 @@ def _fix_numeric_columns(df, columns=None):
         and _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP) not in df.columns
     ):
         df[_get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)] = df.apply(
-            lambda r: _convert_to_float(r.get(Column.CONSUPTION_COMBINED_WLTP, nan))
-            * (4 if r[Column.ENGINE_TYPE] == "PlugIn-Hybrid" else 1),
+            _conver_consumption,
             axis=1,
         )
 
@@ -475,6 +490,7 @@ def _apply_scaler(df, columns, reversed=False):
             "Schrägheck",
             "Stufenheck",
             "Van",
+            "Bus",
             "Coupe",
             "Cabrio",
             "Hochdach-Kombi",
@@ -492,13 +508,16 @@ def _apply_scaler(df, columns, reversed=False):
         scaled_col_name = _get_fixed_and_scaled_column_name(
             Column.CONSUPTION_COMBINED_WLTP
         )
-
         for filter in (
-            is_car & is_electric,
-            is_car & ~is_electric,
-            ~is_car & is_electric,
-            ~is_car & ~is_electric,
+            is_electric,
+            ~is_electric,
         ):
+            # for filter in (
+            #     is_car & is_electric,
+            #     is_car & ~is_electric,
+            #     ~is_car & is_electric,
+            #     ~is_car & ~is_electric,
+            # ):
             df_filter = df[filter]
 
             df_filter[scaled_col_name] = __apply_scaler_for_columns(

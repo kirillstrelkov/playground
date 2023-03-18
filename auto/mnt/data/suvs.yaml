@@ -1,0 +1,136 @@
+# taken from https://www.auto24.ee/new/list.php?d[class]=8,9,11&d[type]=0&d[fuel_id]=0&d[transmission_id]=0&d[drives_id]=0&d[start]=0
+# auto24 miss premium marks and FORD JEEP MERCEDES-BENZ MITSUBISHI SEAT TESLA VOLVO - added manually
+# find models with:
+# print("- " + "\n- ".join(df[(df['Mark'] == 'JEEP')]['model'].unique().tolist()))
+- Audi e-tron
+- Audi e-tron S
+- Audi Q2
+- Audi Q3
+- Audi Q4
+- Audi Q5
+- Audi Q7
+- Audi Q8
+- Audi RS Q3
+- Audi RS Q8
+- Audi SQ2
+- Audi SQ5
+- Audi SQ7
+- Audi SQ8
+- Cadillac XT4
+- Citroen C3 Aircross
+- Citroen C5 Aircross
+- Dacia Duster
+- FORD ECOSPORT
+- FORD PUMA
+- FORD KUGA
+- Honda CR-V
+- Honda HR-V
+- Hyundai Bayon
+- Hyundai Ioniq 5
+- Hyundai Kona
+- Hyundai Nexo
+- Hyundai Santa Fe
+- Hyundai Tucson
+- Isuzu D-Max
+- JEEP GRAND CHEROKEE
+- JEEP RENEGADE
+- JEEP COMPASS
+- JEEP WRANGLER UNLIMITED
+- JEEP CHEROKEE
+- JEEP WRANGLER
+- Kia EV6
+- Kia Niro
+- Kia Sorento
+- Kia Sportage
+- Kia Stonic
+- Kia XCeed
+- LADA 4X4 URBAN
+- Lexus RX
+- Lexus UX
+- Mazda CX-30
+- Mazda CX-5
+- Mazda CX-60
+- Mazda MX-30
+- MERCEDES-BENZ GLA 180
+- MERCEDES-BENZ GLC 200 4MATIC
+- MERCEDES-BENZ GLC 200 D 4MATIC
+- MERCEDES-BENZ GLC 300 4MATIC
+- MERCEDES-BENZ GLC 400 D 4MATIC
+- MERCEDES-BENZ GLE 350 D 4MATIC
+- MERCEDES-BENZ G 350 D
+- MERCEDES-BENZ GLE 300 D 4MATIC
+- MERCEDES-BENZ GLE 450 4MATIC
+- MERCEDES-BENZ GLS 350 D 4MATIC
+- MERCEDES-BENZ GLS 400 D 4MATIC
+- MERCEDES-BENZ GLA 200
+- MERCEDES-BENZ GLA 220 4MATIC
+- MERCEDES-BENZ GLB 250 4MATIC
+- MERCEDES-BENZ GLC 220 D 4MATIC
+- MERCEDES-BENZ GLC 300 D 4MATIC
+- MERCEDES-BENZ GLB 200
+- MERCEDES-BENZ GLC 300 E 4MATIC
+- MERCEDES-BENZ G 400 D
+- MERCEDES-BENZ GLE 400 D 4MATIC COUPE
+- MERCEDES-BENZ GLE 350 D 4MATIC COUPE
+- MERCEDES-BENZ GLE 400 D 4MATIC
+- MERCEDES-BENZ GLA 250 4MATIC
+- MERCEDES-BENZ GLB 220 D 4MATIC
+- MERCEDES-BENZ GLB 200 D 4MATIC
+- MERCEDES-BENZ GLA 200 D 4MATIC
+- MERCEDES-BENZ GLE 350 DE 4MATIC
+- MERCEDES-BENZ GLS 580 4MATIC
+- MERCEDES-BENZ GLA 180 D
+- MINI Countryman
+- MITSUBISHI ASX
+- MITSUBISHI ECLIPSE CROSS
+- MITSUBISHI OUTLANDER
+- Nissan Ariya
+- Nissan Juke
+- Nissan Qashqai
+- Nissan X-Trail
+- Opel Crossland
+- Opel Grandland
+- Opel Mokka
+- Peugeot 2008
+- Peugeot 3008
+- Peugeot 5008
+- Renault Arkana
+- Renault Austral
+- Renault Captur
+- Renault Kadjar
+- Renault Koleos
+- Renault Megane
+- SEAT ARONA
+- SEAT ATECA
+- SEAT CUPRA ATECA
+- SEAT TARRACO
+- Skoda Enyaq iV
+- Skoda Kamiq
+- Skoda Karoq
+- Skoda Kodiaq
+- SsangYong Korando
+- SsangYong Rexton
+- Subaru Forester
+- Subaru XV
+- Suzuki Jimny
+- Suzuki SX4 S-Cross
+- Suzuki Vitara
+- TESLA MODEL X
+- TESLA MODEL Y
+- Toyota bZ4X
+- Toyota C-HR
+- Toyota Corolla Cross
+- Toyota Hilux
+- Toyota Land Cruiser
+- Toyota RAV4
+- Toyota Yaris Cross
+- VOLVO XC40
+- VOLVO XC60
+- VOLVO XC90
+- Volkswagen ID.4
+- Volkswagen ID.5
+- Volkswagen T-Cross
+- Volkswagen T-Roc
+- Volkswagen Taigo
+- Volkswagen Tiguan
+- Volkswagen Touareg

@@ -16,6 +16,8 @@ def get_summary(folder):
 
     dframes = []
     for f in files:
+        if "lock." in f:
+            continue
         df = pd.read_excel(io=f, sheet_name="Uued sõidukid", skiprows=3)
         df = df[df.Kategooria.apply(lambda x: "M1" in str(x))]
 
@@ -29,32 +31,28 @@ def get_summary(folder):
         df[col] = df[col].astype(str)
 
     df = df.convert_dtypes()
+
+    # fix mark naming
+    df["Mark"] = df["Mark"].str.upper()
+    mark_namings = {"ŠKODA": "SKODA", "BMW I": "BMW"}
+    df["Mark"] = df["Mark"].apply(lambda r: mark_namings.get(r, r))
+
     return df
 
 
 def get_model_stats(df):
+    group_columns = [
+        "Mark",
+        "Mudel",
+    ]
+    columns = [
+        "Mark",
+        "Mudel",
+        "Arv",
+    ]
+
     return (
-        df[
-            [
-                "Mark",
-                "Mudel",
-                "Mootori võimsus",
-                "Arv",
-            ]
-        ]
-        .groupby(
-            [
-                "Mark",
-                "Mudel",
-                "Mootori võimsus",
-            ]
-        )
-        .sum()
+        (df[columns].groupby(group_columns).sum())
+        .reset_index()
+        .sort_values("Arv", ascending=False)
     )
-
-
-if __name__ == "__main__":
-    data_dir = os.path.join(os.path.dirname(__file__), "data/2020")
-    df = get_summary(data_dir)
-    # stats = get_model_stats(df).sort_values("Arv", ascending=False)
-    # print(stats.head(20))

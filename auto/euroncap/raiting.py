@@ -1,10 +1,12 @@
+import os
 import re
 from typing import Optional
 from urllib.parse import quote
 
 from easelenium.browser import Browser
 from pandas import DataFrame
-from tqdm import tqdm
+from selenium.common.exceptions import WebDriverException
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
 from utils.misc import concurrent_map, tqdm_concurrent_map
 
 from common_utils import browser_decorator, get_number, get_numbers
@@ -40,6 +42,7 @@ def get_points_and_percentage(text: str):
     return [float(num) for num in re.findall(r"\d+\.?\d*", text)]
 
 
+@retry(retry=retry_if_exception_type(WebDriverException), stop=stop_after_attempt(5))
 @browser_decorator
 def get_raiting(url: str, browser: Browser = None):
     # hash is not supported in "https://www.euroncap.com/en/results/smart/#1/48000"
@@ -75,6 +78,7 @@ def get_raiting(url: str, browser: Browser = None):
     return data
 
 
+@retry(retry=retry_if_exception_type(WebDriverException), stop=stop_after_attempt(5))
 @browser_decorator
 def _get_urls(browser: Browser = None, name: Optional[str] = None):
     # URL contains 2017 - ...
@@ -109,4 +113,4 @@ if __name__ == "__main__":
         .drop_duplicates([Constant.ID])
         .sort_values([Constant.TOTAL_POINTS], ascending=False)
     )
-    df.to_excel("/tmp/euroncap.xlsx")
+    df.to_csv(os.path.join(os.path.dirname(__file__), "euroncap.csv"))

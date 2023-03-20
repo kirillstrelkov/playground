@@ -1,29 +1,24 @@
 "features","nunique","range","type","weight"
-"Grundpreis",3914,"min: 7990.00 mean: 42306.64 max: 64990.00","less is better",30
-"Klassenübliche Ausstattung nach ADAC-Vorgabe",403,"min: 0.00 mean: 4244.29 max: 16228.00","skip",20
-"CO2-Wert kombiniert (WLTP)",208,"min: 0.00 mean: 140.03 max: 359.00","less is better",15
-"Bodenfreiheit maximal",115,"min: 81.00 mean: 160.28 max: 310.00","more is better",10
+"Grundpreis",3914,"min: 7990.00 mean: 42306.64 max: 64990.00","less is better",50
+"CO2-Wert kombiniert (WLTP)",208,"min: 0.00 mean: 140.03 max: 359.00","less is better",20
+"Bodenfreiheit maximal",115,"min: 81.00 mean: 160.28 max: 310.00","more is better",15
 "Kofferraumvolumen dachhoch mit umgeklappter Rücksitzbank",365,"min: 272.00 mean: 3708.08 max: 18400.00","more is better",10
 "Kofferraumvolumen normal",274,"min: 63.00 mean: 503.21 max: 3497.00","more is better",10
-"Kosten",1415,"min: 345.00 mean: 918.47 max: 1493.00","skip",10
-"Tankgröße",61,"min: 13.80 mean: 58.55 max: 105.00","skip",10
 "Verbrauch kombiniert (WLTP)",198,"min: 1.60 mean: 7.41 max: 33.90","less is better",10
-"Werkstattkosten",115,"min: 34.00 mean: 83.23 max: 196.00","skip",10
 "Beschleunigung 0-100km/h",127,"min: 3.30 mean: 9.45 max: 19.10","less is better",8
-"CO2-Effizienzklasse",8,,"skip",0
 "Spurhalteassistent",18,,"category",8
 "Spurwechselassistent",32,,"category",8
+"Fahrgeräusch",17,"min: 62.00 mean: 69.40 max: 78.00","less is better",8
+"Regensensor",6,,"category",7
+"Fernlichtassistent",33,,"category",7
 "Getriebeart",6,,"category",6
-"Regensensor",6,,"category",6
 "Airbag Beifahrer",13,,"category",5
 "Airbag Fahrer",2,,"category",5
 "Autom. Abstandsregelung",38,,"category",5
 "City-Notbremsassistent",5,,"category",5
 "Einparkassistent",49,,"category",5
 "Einparkhilfe",45,,"category",5
-"Einparkhilfe - Bezeichnung",7,,"category",5
-"Fahrgeräusch",17,"min: 62.00 mean: 69.40 max: 78.00","less is better",8
-"Fernlichtassistent",33,,"category",5
+"Einparkhilfe - Bezeichnung",7,,"category",10
 "Garantie (Fahrzeug)",32,,"more is better",5
 "Klimaanlage",35,,"category",5
 "Kofferraumvolumen fensterhoch mit umgeklappter Rücksitzbank",48,,"skip",5
@@ -32,11 +27,17 @@
 "Sitzanzahl",8,,"more is better",5
 "Wendekreis",61,,"skip",5
 "Wertverlust",779,"min: 136.00 mean: 551.22 max: 1015.00","skip",5
+"Batteriekapazität (Netto) in kWh",63,"min: 0.30 mean: 40.52 max: 123.00","more is better",5
+"LED-Scheinwerfer",25,,"category",5
+"Navigation",101,,"category",5
+"Reichweite WLTP (elektrisch)",217,"min: 40.00 mean: 244.77 max: 635.00","more is better",5
+"PreCrash-System",15,,"category",5
 "Kollisionswarnung",4,,"category",4
 "Kopfairbag hinten",4,,"category",4
 "Lichtsensor",4,,"category",4
 "Rücksitzbank umklappbar",4,,"category",4
 "Stauassistent",4,,"category",4
+"Mittenairbag vorne",4,,"category",4
 "Ausstiegswarner",3,,"category",3
 "Fußgängererkennung",3,,"category",3
 "Querverkehrassistent hinten",3,,"category",3
@@ -45,9 +46,21 @@
 "Antriebsart",3,,"category",2
 "Bremsassistent",2,,"category",2
 "Wärmepumpe",7,,"category",2
+"Kurvenbremskontrolle",2,,"category",2
+"Länge",359,"min: 2335.00 mean: 4766.45 max: 7391.00","skip",2
+"Digitaler Radioempfang (DAB)",5,,"category",2
+"Emergency Assistent",2,,"category",2
+"Intelligenter Geschwindigkeitsassistent",2,,"category",4
+"Mittenairbag hinten",2,,"category",2
+"Notruffunktion",11,,"category",4
+"Reifendruckkontrolle",17,,"category",2
+"Klassenübliche Ausstattung nach ADAC-Vorgabe",403,"min: 0.00 mean: 4244.29 max: 16228.00","skip",1
+"Kosten",1415,"min: 345.00 mean: 918.47 max: 1493.00","skip",1
+"Tankgröße",61,"min: 13.80 mean: 58.55 max: 105.00","skip",1
+"Werkstattkosten",115,"min: 34.00 mean: 83.23 max: 196.00","skip",1
 "3-Punkt-Gurt hinten Mitte",3,,"category",1
 "3-Punkt-Gurt hinten Mitte - Bezeichnung",2,,"skip",1
-"Abbiegeassistent",2,,"skip",1
+"Abbiegeassistent",2,,"category",2
 "Abbiegelicht",6,,"category",1
 "Abgasreinigung (Verbrennungsmotor)",6,,"skip",1
 "AC Ladekabel Haushalt",19,,"category",1
@@ -61,7 +74,7 @@
 "Airbag Sonstige - Bezeichnung",6,,"category",1
 "Aktive Kopfstützen",3,,"category",1
 "Aktivlenkung",5,,"skip",1
-"Alufelgen",62,,"category",1
+"Alufelgen",62,,"skip",1
 "Anhängelast gebremst 12%",87,,"skip",1
 "Anhängelast ungebremst",52,,"skip",1
 "Anhängerkupplung",66,,"skip",1
@@ -76,11 +89,10 @@
 "Ausweichassistent",2,,"skip",1
 "Batteriegewicht (Elektro- und PlugIn-Hybrid)",43,,"skip",1
 "Batteriekapazität (Brutto) in kWh",88,,"skip",1
-"Batteriekapazität (Netto) in kWh",63,"min: 0.30 mean: 40.52 max: 123.00","more is better",1
 "Baureihe",520,,"skip",1
 "Baureihenstart",81,,"skip",1
 "Berganfahrassistent",7,,"category",1
-"Betriebskosten",187,"min: 52.00 mean: 168.84 max: 368.00","less is better",1
+"Betriebskosten",187,"min: 52.00 mean: 168.84 max: 368.00","skip",1
 "Breite",166,,"less is better",1
 "Breite (inkl. Außenspiegel)",158,,"skip",1
 "Bremsassistent - Bezeichnung",10,,"skip",1
@@ -94,7 +106,6 @@
 "CO2-Wert (NEFZ)",165,,"skip",1
 "Dachlast",23,,"skip",1
 "DC-Schnell-Ladeanschluss am Fahrzeug",7,,"skip",1
-"Digitaler Radioempfang (DAB)",5,,"category",1
 "Drehmoment (Systemleistung)",127,,"skip",1
 "Drehmoment maximal bei U/min. (Verbrennungsmotor)",50,,"skip",1
 "Durchrostung",8,,"more is better",1
@@ -102,7 +113,6 @@
 "Einbauposition / Motorbauart (Elektromotor 2)",7,,"skip",1
 "Einbauposition / Motorbauart (Elektromotor 3)",1,,"skip",1
 "Einbauposition / Motorbauart (Verbrennungsmotor)",7,,"skip",1
-"Emergency Assistent",2,,"category",1
 "Fahrdynamikregelung",1,,"skip",1
 "Fahrdynamikregelung - Anhänger",3,,"skip",1
 "Fahrdynamikregelung - Bezeichnung",14,,"skip",1
@@ -112,24 +122,23 @@
 "Federung vorne",3,,"skip",1
 "Fensterheber elektr. hinten",8,,"skip",1
 "Fensterheber elektr. vorne",4,,"skip",1
-"Fixkosten",135,"min: 57.00 mean: 118.76 max: 214.00","less is better",1
+"Fixkosten",135,"min: 57.00 mean: 118.76 max: 214.00","skip",1
 "Freisprecheinrichtung",6,,"skip",1
 "Fußgängerschutz-System",2,,"skip",1
 "Füllmenge AdBlue-Behälter",41,,"skip",1
 "Füllmenge AdBlue-Behälter (optional)",2,,"skip",1
 "Gemischaufbereitung (Verbrennungsmotor)",5,,"skip",1
 "Gesamtzuggewicht",309,,"skip",1
-"Haftpflichtbeitrag 100%",16,"min: 297.00 mean: 876.60 max: 1404.00","less is better",1
+"Haftpflichtbeitrag 100%",16,"min: 297.00 mean: 876.60 max: 1404.00","skip",1
 "Head-up-Display (HUD)",35,,"skip",1
 "Herstellerinterne Baureihenbezeichnung",258,,"skip",1
 "HSN Schlüsselnummer",56,,"skip",1
 "Hubraum (Verbrennungsmotor)",76,,"skip",1
-"Höchstgeschwindigkeit",124,"min: 45.00 mean: 191.41 max: 275.00","more is better",1
+"Höchstgeschwindigkeit",124,"min: 45.00 mean: 191.41 max: 275.00","skip",1
 "Höchstgeschwindigkeit elektrisch (Hybrid)",13,,"skip",1
 "Höhe",358,,"skip",1
 "id",6343,,"skip",1
 "image",521,,"skip",1
-"Intelligenter Geschwindigkeitsassistent",2,,"category",1
 "Isofix",5,,"category",1
 "Isofix - Bezeichnung",5,,"category",1
 "Karosserie",15,,"skip",1
@@ -143,8 +152,7 @@
 "Kopfstützen hinten Mitte",5,,"skip",1
 "Kraftstoffart",6,,"skip",1
 "Kraftstoffart (2.Antrieb)",2,,"skip",1
-"Kreuzungsassistent",3,,"skip",1
-"Kurvenbremskontrolle",2,,"category",2
+"Kreuzungsassistent",3,,"category",3
 "Kurvenlicht",3,,"skip",1
 "Lackgarantie",10,,"skip",1
 "Ladeanschlussposition",7,,"skip",1
@@ -153,7 +161,6 @@
 "Ladezeiten",153,,"skip",1
 "Ladezustandskontrolle",5,,"skip",1
 "Laserscheinwerfer",3,,"skip",1
-"LED-Scheinwerfer",25,,"category",1
 "Lederausstattung",95,,"skip",1
 "Leergewicht (EU)",885,,"skip",1
 "Leistung / Drehmoment (Elektromotor 1)",126,,"skip",1
@@ -161,13 +168,10 @@
 "Leistung / Drehmoment (Elektromotor 3)",1,,"skip",1
 "Leistung / Drehmoment (Verbrennungsmotor)",343,,"skip",1
 "Leistung maximal bei U/min. (Verbrennungsmotor)",45,,"skip",1
-"Leistung maximal in kW (Systemleistung)",151,,"more is better",1
+"Leistung maximal in kW (Systemleistung)",151,,"skip",1
 "Leistung maximal in PS (Systemleistung)",160,,"skip",1
-"Länge",359,"min: 2335.00 mean: 4766.45 max: 7391.00","less is better",2
 "Marke",61,,"skip",1
 "Metallic-Lackierung",88,,"skip",1
-"Mittenairbag hinten",2,,"category",1
-"Mittenairbag vorne",4,,"category",4
 "Modell",1782,,"skip",1
 "Modellstart",63,,"skip",1
 "Motorart",8,,"skip",1
@@ -175,12 +179,9 @@
 "Müdigkeitserkennung",9,,"skip",1
 "Nachtsicht-Assistent",5,,"skip",1
 "name",5842,,"skip",1
-"Navigation",101,,"category",1
 "Navigation - Bezeichnung",2,,"skip",1
 "Nebelscheinwerfer",31,,"category",1
 "Nennleistung in kW",74,,"skip",1
-"Notruffunktion",11,,"category",1
-"PreCrash-System",15,,"skip",1
 "PreCrash-System - Bezeichnung",3,,"skip",1
 "processed date",6366,,"skip",1
 "Radio",23,,"skip",1
@@ -188,9 +189,7 @@
 "Radstand",210,,"skip",1
 "Rampenwinkel",60,,"skip",1
 "Reichweite NEFZ (elektrisch)",23,,"skip",1
-"Reichweite WLTP (elektrisch)",217,"min: 40.00 mean: 244.77 max: 635.00","more is better",1
 "Reichweite WLTP City (elektrisch)",145,,"skip",1
-"Reifendruckkontrolle",17,,"category",1
 "Reifengröße",206,,"skip",1
 "Reifengröße hinten (abweichend)",26,,"skip",1
 "Runflat",11,,"skip",1
@@ -217,7 +216,7 @@
 "Tankeinbauort",3,,"skip",1
 "Tankgröße (2.Antrieb)",4,,"skip",1
 "Tankgröße (optional)",12,,"skip",1
-"Teilkaskobeitrag 150 € SB",19,,"less is better",1
+"Teilkaskobeitrag 150 € SB",19,,"skip",1
 "Trailer-Assist",17,,"skip",1
 "TSN Schlüsselnummer",998,,"skip",1
 "TSN Schlüsselnummer 2",144,,"skip",1
@@ -235,8 +234,9 @@
 "Verbrauch Kurzstrecke (WLTP)",123,,"skip",1
 "Verbrauch Landstraße (WLTP)",73,,"skip",1
 "Verbrauch Stadtrand (WLTP)",83,,"skip",1
-"Verkehrsschild-Erkennung",21,,"category",1
-"Vollkaskobetrag 100% 500 € SB",22,"min: 404.00 mean: 1212.93 max: 3467.00","less is better",1
+"Verkehrsschild-Erkennung",21,,"category",4
+"Vollkaskobetrag 100% 500 € SB",22,"min: 404.00 mean: 1212.93 max: 3467.00","skip",1
 "Wattiefe",11,,"skip",1
-"WLAN Hotspot",8,,"category",1
-"Xenon-Scheinwerfer",6,,"category",1
+"WLAN Hotspot",8,,"skip",1
+"Xenon-Scheinwerfer",6,,"skip",1
+"CO2-Effizienzklasse",8,,"skip",0

@@ -278,68 +278,6 @@ def _fix_numeric_columns(df, columns=None):
     return df.join(df_numeric)
 
 
-def _fix_missing_values_by_adding_avg(df):
-    def fix_name(df, df_bad, groupby_col, value):
-        if (
-            not df.loc[
-                (df[groupby_col] == value) & (df.id.isin(df_bad.id)),
-                Column.NAME,
-            ]
-            .iloc[0]
-            .endswith("*")
-        ):
-            df.loc[
-                (df[groupby_col] == value) & (df.id.isin(df_bad.id)),
-                Column.NAME,
-            ] += "*"
-
-    # fix average by SERIE
-    groupby_col = Column.SERIE
-    for col in Constant.COLS_WITH_NUMERIC_DATA:
-        if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
-            continue
-
-        df_bad = df[pd.isna(df[col])]
-        if df_bad.empty:
-            continue
-
-        for value in df_bad[groupby_col].unique():
-            df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id)), col] = (
-                df[df[groupby_col] == value]
-                .groupby(groupby_col)
-                .mean()
-                .get(col, [pd.NA])[0]
-            )
-            fix_name(df, df_bad, groupby_col, value)
-
-    # fix average by MARK and BODY_TYPE
-    groupby_col = Column.MARK
-    for col in Constant.COLS_WITH_NUMERIC_DATA:
-        if col in {Column.BATTERY_CAPACITY, Column.FUEL_TANK_SIZE}:
-            continue
-
-        df_bad = df[pd.isna(df[col])]
-        for value in df_bad[groupby_col].unique():
-            body_types = (
-                df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id))][
-                    Column.BODY_TYPE
-                ]
-                .unique()
-                .tolist()
-            )
-            # NOTE: sometimes might be multiple body types
-            body_type = body_types[0]
-            df.loc[(df[groupby_col] == value) & (df.id.isin(df_bad.id)), col] = (
-                df[(df[groupby_col] == value) & (df[Column.BODY_TYPE] == body_type)]
-                .groupby(groupby_col)
-                .mean()
-                .get(col, [pd.NA])[0]
-            )
-            fix_name(df, df_bad, groupby_col, value)
-
-    return df
-
-
 def _filter_by_models(df, names):
     return df[
         df[Column.NAME].apply(
@@ -353,44 +291,12 @@ def get_cars():
     return pd.read_csv(path)
 
 
-def _filtered_cars(df=None, fix_missing=False):
+def _filtered_cars(df=None):
     if df is None:
         df = get_cars()
 
     df = _fix_numeric_columns(df)
 
-    if fix_missing:
-        df = _fix_missing_values_by_adding_avg(df)
-
-    return df
-
-
-def _apply_de_discount(df, column):
-    df = _fix_numeric_columns(df, [column])
-
-    def get_discount(price, motor_type):
-        netto_price = price * 0.81
-        if motor_type == "Elektro":
-            if netto_price <= 40000:
-                return 6750
-            elif netto_price <= 65000:
-                return 5250
-        return 0
-
-    def apply_discount(row):
-        motor_type = row[Column.ENGINE_TYPE]
-        price = row[_get_fixed_column_name(Column.PRICE)]
-        name = row[Column.NAME]
-        if "Model Y" in name:
-            additional_discount = 2250
-        else:
-            additional_discount = 0
-        row[_get_fixed_column_name(column)] = max(
-            0, price - get_discount(price, motor_type) - additional_discount
-        )
-        return row
-
-    df = df.apply(apply_discount, axis=1)
     return df
 
 
@@ -404,7 +310,7 @@ def _is_model_name(full_name, part_name):
         return all([part in words for part in search_words])
 
 
-def get_scored_df(df=None, de_discount=False, feature_file_name="feature.csv"):
+def get_scored_df(df=None, feature_file_name="feature.csv"):
     if df is None:
         df = _filtered_cars()
 
@@ -423,9 +329,6 @@ def get_scored_df(df=None, de_discount=False, feature_file_name="feature.csv"):
         .groupby("type")[COLUMN_FEATURE]
         .apply(list)
     )
-
-    if de_discount:
-        df = _apply_de_discount(df, Column.PRICE)
 
     a1 = _apply_scaler(df, df_features_group[FeatureType.MORE_IS_BETTER])
     b1 = _apply_scaler(df, df_features_group[FeatureType.LESS_IS_BETTER], reversed=True)

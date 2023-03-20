@@ -42,8 +42,8 @@ def df_filtered_cars(df_cars):
 
 
 @pytest.fixture
-def df_scored_de_discount_minmax_scaler(df_filtered_cars):
-    return get_scored_df(df_filtered_cars, de_discount=True)
+def df_scored(df_filtered_cars):
+    return get_scored_df(df_filtered_cars)
 
 
 @pytest.fixture
@@ -77,10 +77,9 @@ def _get_car_by_name(df, name):
     [
         ("i30", "Tucson"),
         ("Impreza", "Forester"),
-        ("Golf", "Tiguan"),
         ("Astra", "Grandland"),
         ("Impreza", "XV"),
-        ("Ceed", "Sportage"),
+        (" Ceed", "Sportage"),
     ],
 )
 def test_scored_parents_suv_is_better(df_scored_parent, car_name, suv_name):
@@ -90,15 +89,11 @@ def test_scored_parents_suv_is_better(df_scored_parent, car_name, suv_name):
 
 
 def test_all_nans_are_properly_fix_scaled_weighted(
-    df_scored_de_discount_minmax_scaler,
+    df_scored,
 ):
-    weighted_columns = [
-        col for col in df_scored_de_discount_minmax_scaler.columns if "weighted" in col
-    ]
+    weighted_columns = [col for col in df_scored.columns if "weighted" in col]
     for wcol in weighted_columns:
-        df_weighted_na = df_scored_de_discount_minmax_scaler[
-            df_scored_de_discount_minmax_scaler[wcol].isin(ZERO_POINTS_MAPPING)
-        ]
+        df_weighted_na = df_scored[df_scored[wcol].isin(ZERO_POINTS_MAPPING)]
         names = wcol.split(NAME_SPLITTER)
         for i in range(1, len(names) - 1):
             prev_name = NAME_SPLITTER.join(names[: len(names) - i])
@@ -109,23 +104,20 @@ def test_all_nans_are_properly_fix_scaled_weighted(
                 assert df_empty.empty
 
 
-def test_scaled_columns_minmax(df_scored_de_discount_minmax_scaler):
-    df = df_scored_de_discount_minmax_scaler
+def test_scaled_columns_minmax(df_scored):
+    df = df_scored
     columns = [c for c in df.columns if c.endswith("scaled")]
     for col in columns:
         assert df[col].min() >= -0.01
         assert df[col].max() <= 1.01
 
 
-def test_fixed_columens(df_scored_de_discount_minmax_scaler):
-    assert (
-        _get_fixed_column_name(Column.COSTS)
-        in df_scored_de_discount_minmax_scaler.columns
-    )
+def test_fixed_columens(df_scored):
+    assert _get_fixed_column_name(Column.COSTS) in df_scored.columns
 
 
-def test_max_weights(df_scored_de_discount_minmax_scaler, df_features):
-    df = df_scored_de_discount_minmax_scaler
+def test_max_weights(df_scored, df_features):
+    df = df_scored
     for _, row in df_features.iterrows():
         feature = row[COLUMN_FEATURE]
         type = row[COLUMN_FEATURE_TYPE]
@@ -136,19 +128,15 @@ def test_max_weights(df_scored_de_discount_minmax_scaler, df_features):
 
 
 def test_consumption(
-    df_scored_de_discount_minmax_scaler,
+    df_scored,
 ):
     col_fixed = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
     col_scaled = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
     col_weighted = _get_fixed_scaled_and_weighted_column_name(
         Column.CONSUPTION_COMBINED_WLTP
     )
-    df_e = df_scored_de_discount_minmax_scaler[
-        df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] == "Elektro"
-    ]
-    df_non_e = df_scored_de_discount_minmax_scaler[
-        df_scored_de_discount_minmax_scaler[Column.ENGINE_TYPE] != "Elektro"
-    ]
+    df_e = df_scored[df_scored[Column.ENGINE_TYPE] == "Elektro"]
+    df_non_e = df_scored[df_scored[Column.ENGINE_TYPE] != "Elektro"]
     cols = [
         "name",
         Column.CONSUPTION_COMBINED_WLTP,
@@ -200,10 +188,8 @@ def test_consumption(
     assert non_e_car_min[col_fixed] > non_e_car_max[col_fixed]
     assert non_e_car_min[col_scaled] < non_e_car_max[col_scaled]
 
-    tesla = _get_car_by_name(df_scored_de_discount_minmax_scaler, __TESLA_M3_NAME)
-    subaru = _get_car_by_name(
-        df_scored_de_discount_minmax_scaler, __SUBARU_MY_IMPREZA_NAME
-    )
+    tesla = _get_car_by_name(df_scored, __TESLA_M3_NAME)
+    subaru = _get_car_by_name(df_scored, __SUBARU_MY_IMPREZA_NAME)
     df_tesla = tesla[cols]
     df_subaru = subaru[cols]
 
@@ -218,9 +204,9 @@ def test_consumption(
 
 
 def test_tesla_scaled_consumption_better_than_subaru(
-    df_scored_de_discount_minmax_scaler,
+    df_scored,
 ):
-    df = df_scored_de_discount_minmax_scaler
+    df = df_scored
     tesla = _get_car_by_name(df, __TESLA_M3_NAME)
     subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
 
@@ -239,20 +225,14 @@ def test_tesla_scaled_consumption_better_than_subaru(
     assert tesla[weighted_consumption] > subaru[weighted_consumption]
 
 
-def test_model3_score_better_than_impreza(df_scored_de_discount_minmax_scaler):
-    tesla = _get_car_by_name(df_scored_de_discount_minmax_scaler, __TESLA_M3_NAME)
-    subaru = _get_car_by_name(
-        df_scored_de_discount_minmax_scaler, __SUBARU_MY_IMPREZA_NAME
-    )
+def test_model3_score_better_than_impreza(df_scored):
+    tesla = _get_car_by_name(df_scored, __TESLA_M3_NAME)
+    subaru = _get_car_by_name(df_scored, __SUBARU_MY_IMPREZA_NAME)
 
     assert tesla[Column.TOTAL_SCORE] > subaru[Column.TOTAL_SCORE]
     assert tesla[Column.EURO_PER_SCORE] > subaru[Column.EURO_PER_SCORE]
 
-    cols = [
-        col
-        for col in df_scored_de_discount_minmax_scaler.columns
-        if "Einparkhilfe - Bezeichnung" in col
-    ]
+    cols = [col for col in df_scored.columns if "Einparkhilfe - Bezeichnung" in col]
     tesla_park_assist = tesla[cols]
     subaru_park_assist = subaru[cols]
     assert tesla_park_assist.notna().all()
@@ -284,16 +264,16 @@ def test_model3_score_better_than_impreza(df_scored_de_discount_minmax_scaler):
         (__TESLA_MY_NAME, "Hyundai IONIQ 5 (77,4 kWh) UNIQ-Paket 4WD"),
     ],
 )
-def test_compare_two_cars(df_scored_de_discount_minmax_scaler, name1, name2):
-    df = df_scored_de_discount_minmax_scaler
+def test_compare_two_cars(df_scored, name1, name2):
+    df = df_scored
     car1 = _get_car_by_name(df, name1)
     car2 = _get_car_by_name(df, name2)
     t = _get_diff(df, car1, car2, 20)
     assert car1[Column.TOTAL_SCORE] > car2[Column.TOTAL_SCORE]
 
 
-def test_small_test(df_scored_de_discount_minmax_scaler):
-    df = df_scored_de_discount_minmax_scaler
+def test_small_test(df_scored):
+    df = df_scored
     df_subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
     df_bmw = _get_car_by_name(df, "BMW 118i M")
 

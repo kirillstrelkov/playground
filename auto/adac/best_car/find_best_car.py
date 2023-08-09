@@ -4,7 +4,7 @@ from heapq import nlargest
 
 import pandas as pd
 from loguru import logger
-from numpy import dtype, float64, nan
+from numpy import dtype, nan
 from pandas.core.frame import DataFrame
 from sklearn.preprocessing import MinMaxScaler
 
@@ -14,6 +14,8 @@ from auto.adac.best_car.utils import (
     COLUMN_FEATURE_WEIGHT,
     FeatureType,
 )
+
+NUMBER_REGEXP = re.compile(r"\d+[\.,]?\d*")
 
 _ZERO_POINT_VALUE = "n.b."
 ZERO_POINTS_MAPPING = {
@@ -107,12 +109,15 @@ Reichweite WLTP (elektrisch)
     )
 
 
-def _convert_to_float(x, strict=False):
+def _convert_to_number(x, strict=False):
     if type(x) == str:
-        match = re.search(r"\d+[.,]?\d*", x)
+        match = NUMBER_REGEXP.search(x)
 
         if match:
-            return float(match.group().replace(".", "").replace(",", "."))
+            if "." in x or "," in x:
+                return float(match.group().replace(".", "").replace(",", "."))
+            else:
+                return int(match.group())
         elif strict:
             return x
         else:
@@ -198,14 +203,14 @@ def _get_mappings(column, values):
         max_val = len(mappings) + 1
     else:
         for val in values:
-            new_val = _convert_to_float(val, True)
+            new_val = _convert_to_number(val, True)
             if type(new_val) == float and not pd.isna(new_val):
                 mappings[val] = new_val
 
         if mappings:
             mappings["Paket"] = (
                 pd.Series(list(values))
-                .apply(lambda x: _convert_to_float(x))
+                .apply(lambda x: _convert_to_number(x))
                 .dropna()
                 .mean()
             )
@@ -254,9 +259,9 @@ def _fix_numeric_columns(df, columns=None):
             consumption = consumption1
             if "kwh/" in str(consumption1).lower():
                 consumption = consumption2
-            return _convert_to_float(consumption) * 4
+            return _convert_to_number(consumption) * 4
         else:
-            return _convert_to_float(consumption1)
+            return _convert_to_number(consumption1)
 
     if not columns:
         columns = Constant.COLS_WITH_NUMERIC_DATA
@@ -272,7 +277,7 @@ def _fix_numeric_columns(df, columns=None):
 
     columns = [col for col in columns if _get_fixed_column_name(col) not in df.columns]
 
-    df_numeric = df[columns].applymap(_convert_to_float)
+    df_numeric = df[columns].applymap(_convert_to_number)
     df_numeric.columns = [_get_fixed_column_name(col) for col in df_numeric.columns]
 
     return df.join(df_numeric)

@@ -7,7 +7,7 @@ from auto.adac.best_car.find_best_car import (
     NAME_SPLITTER,
     ZERO_POINTS_MAPPING,
     Column,
-    _convert_to_float,
+    _convert_to_number,
     _filter_by_models,
     _filtered_cars,
     _get_fixed_and_scaled_column_name,

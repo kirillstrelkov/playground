@@ -51,8 +51,7 @@ def get_summary(folder):
         year = (
             df[COLUMN_REG_DATE]
             .value_counts(dropna=True, ascending=False)
-            .reset_index()["index"]
-            .tolist()[0]
+            .index.tolist()[0]
         )
         df = df[df[COLUMN_REG_DATE] == year]
         df[COLUMN_REG_DATE] = pd.to_numeric(df[COLUMN_REG_DATE], downcast="integer")

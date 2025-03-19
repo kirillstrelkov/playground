@@ -7,10 +7,10 @@ tenacity
 pytest
 pytest-html
 pytest-env
-black
 easelenium
 flake8
-pandas
+numpy==1.26.4
+pandas==1.4.4
 plotly
 odfpy
 openpyxl
@@ -20,7 +20,6 @@ jupyter_nbextensions_configurator
 jupyter_contrib_nbextensions
 xlrd
 tqdm
-jupyter-kite
 yfinance
 loguru
 tabulate
@@ -30,3 +29,14 @@ pandoc
 nbconvert
 chart_studio
 python-dotenv
+scikit-learn
+google-api-python-client
+pyyaml
+requests
+wikipedia
+webdriver_manager
+ruff
+python-telegram-bot
+setuptools
+notebook
+lxml

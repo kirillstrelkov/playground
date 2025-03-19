@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 import re
 
 import pandas as pd
+from loguru import logger
 
 PRIVATE_CUSTOMER = "FÜÜSILINE"
 
@@ -11,13 +13,15 @@ COLUMN_COUNT = "Arv"
 COLUMN_CITY = "Linn"
 COLUMN_REG_DATE = "Esm reg aasta"
 COLUMN_ENGINE_TYPE = "Mootori tüüp"
+COLUMN_TRANSMISSION = "Käigukasti tüüp"
 COLUMNS = [
     "Mark",
     "Mudel",
     COLUMN_SHORT_NAME,
-    "Mootori tüüp",
+    COLUMN_ENGINE_TYPE,
     "Mootori maht",
     "Mootori võimsus",
+    COLUMN_TRANSMISSION,
     COLUMN_CITY,
     COLUMN_CUSTOMER,
     "Arv",
@@ -25,24 +29,40 @@ COLUMNS = [
 ]
 
 
-def get_summary(folder):
-    files = sorted(
-        [
-            os.path.join(folder, p)
-            for p in os.listdir(folder)
-            if os.path.isfile(os.path.join(folder, p))
-        ]
-    )
+def get_summary(path: Path) -> pd.DataFrame:
+    if Path(path).is_dir():
+        files = sorted(
+            [
+                Path(os.path.join(path, p))
+                for p in os.listdir(path)
+                if os.path.isfile(os.path.join(path, p))
+            ]
+        )
+    else:
+        files = [path]
 
     dframes = []
     for f in files:
-        if "lock." in f:
+        if "lock." in f.name:
             continue
+        logger.trace(f"Reading file {f}")
         df = pd.read_excel(io=f, sheet_name="Uued sõidukid", skiprows=3)
         df = df[df.Kategooria.apply(lambda x: "M1" in str(x))]
 
         # replace columns
-        columns_mappings = {"Väljalaske aasta": COLUMN_REG_DATE}
+        columns_mappings = {
+            "Väljalaske aasta": COLUMN_REG_DATE,
+            "MOOTORI_TYYP": COLUMN_ENGINE_TYPE,
+            "V.KAS/OM Linn": COLUMN_CITY,
+            "V.KAS/OM TYYP": COLUMN_CUSTOMER,
+            "Year of ESMANE_REG_KP": COLUMN_REG_DATE,
+            "tk": "Arv",
+            "MOOTORI_VOIMSUS": "Mootori võimsus",
+            "MOOTORI_MAHT": "Mootori maht",
+            "VARV": "Värv",
+            "KAIGUKASTI_TYYP": COLUMN_TRANSMISSION,
+        }
+
         if COLUMN_CUSTOMER not in df.columns:
             columns_mappings.update({"Tüüp": COLUMN_CUSTOMER})
 
@@ -57,6 +77,9 @@ def get_summary(folder):
         df[COLUMN_REG_DATE] = pd.to_numeric(df[COLUMN_REG_DATE], downcast="integer")
 
         dframes.append(df)
+
+    if not dframes:
+        return pd.DataFrame()
 
     df = pd.concat(dframes)
     for col in [
@@ -127,6 +150,7 @@ def get_summary(folder):
                     " PHV": "",
                     " GR ": " ",
                     " PLUS": "",
+                    " PHEV": "",
                 },
             ),
         }
@@ -140,10 +164,16 @@ def get_summary(folder):
 
     df[COLUMN_SHORT_NAME] = df["name"].apply(_fix_name)
 
+    def _fix_customer(customer):
+        customer = customer.upper()
+        if "FYYSILINE" in customer:
+            return PRIVATE_CUSTOMER
+        if "JURIIDILINE" in customer:
+            return "JÜRIIDILINE"
+        return customer.replace(" ISIK", "")
+
     # Fix customers
-    df[COLUMN_CUSTOMER] = (
-        df[COLUMN_CUSTOMER].str.upper().apply(lambda c: c.replace(" ISIK", ""))
-    )
+    df[COLUMN_CUSTOMER] = df[COLUMN_CUSTOMER].apply(_fix_customer)
 
     # Fix city
     df[COLUMN_CITY] = (
@@ -158,9 +188,11 @@ def get_summary(folder):
         df[COLUMN_ENGINE_TYPE]
         .str.upper()
         .apply(
-            lambda t: "CNG"
-            if "CNG" in t
-            else _replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})
+            lambda t: (
+                "CNG"
+                if "CNG" in t
+                else _replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})
+            )
         )
     )
 

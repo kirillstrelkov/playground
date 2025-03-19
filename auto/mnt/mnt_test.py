@@ -1,18 +1,52 @@
 import os
+from pathlib import Path
 import re
+from typing import DefaultDict
 
 import pytest
 
 from auto.mnt.mnt_sum import (
     COLUMN_CITY,
+    COLUMN_COUNT,
     COLUMN_CUSTOMER,
     COLUMN_ENGINE_TYPE,
+    COLUMN_REG_DATE,
+    COLUMN_TRANSMISSION,
+    COLUMNS,
     PRIVATE_CUSTOMER,
     get_model_stats,
     get_summary,
 )
 
-__YEARS = list(range(2018, 2023))
+__YEARS = list(range(2018, 2025))
+
+
+def test_columns():
+    expected_set = DefaultDict(set)
+    expected_set[2018] = {"Värv", "Käigukasti tüüp"}
+    expected_set[2019] = {"Värv", "Käigukasti tüüp"}
+    expected_set[2020] = {"Värv", "Käigukasti tüüp"}
+    expected_set[2021] = {"Käigukasti tüüp"}
+    expected_set[2022] = {"Käigukasti tüüp"}
+    errors = []
+    for path in Path(os.path.join(os.path.dirname(__file__), "data")).glob("**/*.xls*"):
+        df = get_summary(path)
+        columns = COLUMNS + [
+            COLUMN_CUSTOMER,
+            COLUMN_COUNT,
+            COLUMN_CITY,
+            COLUMN_REG_DATE,
+            COLUMN_ENGINE_TYPE,
+            COLUMN_TRANSMISSION,
+        ]
+        year = df[COLUMN_REG_DATE].unique().tolist()[0]
+        diff = set(columns).difference(set(df.columns))
+        if diff.difference(
+            expected_set[year]
+        ):  # expected_set can contain more - because in some months are more columns
+            errors.append(f"Missing columns in {path.name}: {diff}")
+
+    assert not errors, "\n".join(errors)
 
 
 @pytest.mark.parametrize(

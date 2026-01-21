@@ -30,7 +30,7 @@ ZERO_POINTS_MAPPING = {
 NAME_SPLITTER = "|"
 
 
-class Column(object):
+class Column:
     ID = "id"
     SEATS = "Sitzanzahl"
     TRANSMISSION = "Getriebeart"
@@ -62,7 +62,7 @@ class Column(object):
     EURO_PER_SCORE = "Euro per score"
 
 
-class ColumnSpec(object):
+class ColumnSpec:
     ADAC_COLUMN = "adac column"
     ADAC_VALUES = "adac values, ascending order"
     FEATURE = "feature"
@@ -71,42 +71,22 @@ class ColumnSpec(object):
     PREFIX = "prefix"
 
 
-class Constant(object):
+class Constant:
     TRANSMISSION_MANUAL = "Schaltgetriebe"
 
-    COLS_WITH_NUMERIC_DATA = set(
-        """
-CO2-Wert kombiniert (WLTP)
-Höchstgeschwindigkeit
-Beschleunigung 0-100km/h
-Fahrgeräusch
-Länge
-Kofferraumvolumen normal
-Kofferraumvolumen dachhoch mit umgeklappter Rücksitzbank
-Bodenfreiheit maximal
-Wertverlust
-Betriebskosten
-Fixkosten
-Werkstattkosten
-Kosten
-KFZ-Steuer pro Jahr ohne Steuerbefreiung
-Haftpflichtbeitrag 100%
-Vollkaskobetrag 100% 500 € SB
-Reichweite WLTP (elektrisch)
-""".strip().splitlines()
-        + [
-            Column.COSTS_FIX,
-            Column.COSTS_OPERATING,
-            Column.COSTS_WORKSHOP,
-            Column.ADAC_PAKET,
-            Column.PRICE,
-            Column.ACCELERATION,
-            Column.FUEL_TANK_SIZE,
-            Column.BATTERY_CAPACITY,
-            Column.CONSUPTION_TOTAL_NEFZ,
-            Column.CONSUPTION_COMBINED_WLTP,
-        ]
-    )
+    COLS_WITH_NUMERIC_DATA = {
+        *"""\nCO2-Wert kombiniert (WLTP)\nHöchstgeschwindigkeit\nBeschleunigung 0-100km/h\nFahrgeräusch\nLänge\nKofferraumvolumen normal\nKofferraumvolumen dachhoch mit umgeklappter Rücksitzbank\nBodenfreiheit maximal\nWertverlust\nBetriebskosten\nFixkosten\nWerkstattkosten\nKosten\nKFZ-Steuer pro Jahr ohne Steuerbefreiung\nHaftpflichtbeitrag 100%\nVollkaskobetrag 100% 500 € SB\nReichweite WLTP (elektrisch)\n""".strip().splitlines(),
+        Column.COSTS_FIX,
+        Column.COSTS_OPERATING,
+        Column.COSTS_WORKSHOP,
+        Column.ADAC_PAKET,
+        Column.PRICE,
+        Column.ACCELERATION,
+        Column.FUEL_TANK_SIZE,
+        Column.BATTERY_CAPACITY,
+        Column.CONSUPTION_TOTAL_NEFZ,
+        Column.CONSUPTION_COMBINED_WLTP,
+    }
 
 
 def _convert_to_number(x, strict=False):
@@ -116,14 +96,11 @@ def _convert_to_number(x, strict=False):
         if match:
             if "." in x or "," in x:
                 return float(match.group().replace(".", "").replace(",", "."))
-            else:
-                return int(match.group())
-        elif strict:
+            return int(match.group())
+        if strict:
             return x
-        else:
-            return nan
-    else:
-        return x
+        return nan
+    return x
 
 
 def _get_mappings(column, values):
@@ -144,7 +121,6 @@ def _get_mappings(column, values):
             "Rückfahrkamera",
             "hinten",
         ],
-        "Kopfairbag vorne - Bezeichnung": ["Windowbag", "Kopfairbag separat"],
         "Seitenairbag vorne - Bezeichnung": [
             "inkl. Kopfschutz",
             "inkl. Hüftschutz",
@@ -208,12 +184,7 @@ def _get_mappings(column, values):
                 mappings[val] = new_val
 
         if mappings:
-            mappings["Paket"] = (
-                pd.Series(list(values))
-                .apply(lambda x: _convert_to_number(x))
-                .dropna()
-                .mean()
-            )
+            mappings["Paket"] = pd.Series(list(values)).apply(lambda x: _convert_to_number(x)).dropna().mean()
             if len(mappings) > 2:
                 max_val, max_second = nlargest(2, mappings.values())
                 max_val = max(mappings.values()) + max_val - max_second
@@ -240,9 +211,7 @@ def _fix_category_columns(df, columns):
 
         diff_vals = set(unique_values).difference(set(mappings.keys()))
         if diff_vals:
-            assert (
-                not diff_vals
-            ), f"Failed to create mapping for '{col}': diff: {list(diff_vals)}"
+            assert not diff_vals, f"Failed to create mapping for '{col}': diff: {list(diff_vals)}"
         else:
             new_col = df[col].fillna(_ZERO_POINT_VALUE)
             data[_get_fixed_column_name(col)] = new_col.apply(lambda x: mappings[x])
@@ -260,8 +229,7 @@ def _fix_numeric_columns(df, columns=None):
             if "kwh/" in str(consumption1).lower():
                 consumption = consumption2
             return _convert_to_number(consumption) * 4
-        else:
-            return _convert_to_number(consumption1)
+        return _convert_to_number(consumption1)
 
     if not columns:
         columns = Constant.COLS_WITH_NUMERIC_DATA
@@ -284,11 +252,7 @@ def _fix_numeric_columns(df, columns=None):
 
 
 def _filter_by_models(df, names):
-    return df[
-        df[Column.NAME].apply(
-            lambda x: any([_is_model_name(x, name) for name in names])
-        )
-    ]
+    return df[df[Column.NAME].apply(lambda x: any(_is_model_name(x, name) for name in names))]
 
 
 def get_cars():
@@ -300,9 +264,7 @@ def _filtered_cars(df=None):
     if df is None:
         df = get_cars()
 
-    df = _fix_numeric_columns(df)
-
-    return df
+    return _fix_numeric_columns(df)
 
 
 def _is_model_name(full_name, part_name):
@@ -311,55 +273,38 @@ def _is_model_name(full_name, part_name):
     if "bmw" == words[0] == search_words[0]:
         assert len(search_words) == 2, f"search '{part_name}' not supported for bmw"
         return words[1].startswith(search_words[1])
-    else:
-        return all([part in words for part in search_words])
+    return all(part in words for part in search_words)
 
 
 def get_scored_df(df=None, feature_file_name="feature.csv"):
     if df is None:
         df = _filtered_cars()
 
-    df_duplicates = df[df.duplicated([Column.ID])][
-        [Column.ID, Column.NAME]
-    ].reset_index(drop=True)
+    df_duplicates = df[df.duplicated([Column.ID])][[Column.ID, Column.NAME]].reset_index(drop=True)
     if not df_duplicates.empty:
         logger.warning(f"Duplicates:\n{df_duplicates.to_string()}")
     df = df.drop_duplicates([Column.ID]).reset_index(drop=True)
 
-    df_features = pd.read_csv(
-        os.path.join(os.path.dirname(__file__), feature_file_name)
-    )
+    df_features = pd.read_csv(os.path.join(os.path.dirname(__file__), feature_file_name))
     df_features_group = (
-        df_features[df_features[COLUMN_FEATURE_TYPE] != FeatureType.SKIP]
-        .groupby("type")[COLUMN_FEATURE]
-        .apply(list)
+        df_features[df_features[COLUMN_FEATURE_TYPE] != FeatureType.SKIP].groupby("type")[COLUMN_FEATURE].apply(list)
     )
 
     a1 = _apply_scaler(df, df_features_group[FeatureType.MORE_IS_BETTER])
     b1 = _apply_scaler(df, df_features_group[FeatureType.LESS_IS_BETTER], reversed=True)
     c1 = _apply_categorized_scaler(df, df_features_group[FeatureType.CATEGORY])
 
-    a2 = _apply_weights(
-        a1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.MORE_IS_BETTER]
-    )
-    b2 = _apply_weights(
-        b1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.LESS_IS_BETTER]
-    )
-    c2 = _apply_weights(
-        c1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.CATEGORY]
-    )
+    a2 = _apply_weights(a1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.MORE_IS_BETTER])
+    b2 = _apply_weights(b1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.LESS_IS_BETTER])
+    c2 = _apply_weights(c1, df_features[df_features[COLUMN_FEATURE_TYPE] == FeatureType.CATEGORY])
 
     tmp_df = df.reset_index(drop=True).join([a1, b1, c1])
     new_df = tmp_df.reset_index(drop=True).join([a2, b2, c2])
     df_cols = set(new_df.columns.tolist())
     cols = [c for c in df_cols if _is_weighted(c)]
     new_df[Column.TOTAL_SCORE] = new_df[cols].sum(axis=1)
-    new_df[Column.EURO_PER_SCORE] = (
-        new_df[_get_fixed_column_name(Column.PRICE)] / new_df[Column.TOTAL_SCORE]
-    )
-    return new_df.sort_values([Column.TOTAL_SCORE], ascending=False).reset_index(
-        drop=True
-    )
+    new_df[Column.EURO_PER_SCORE] = new_df[_get_fixed_column_name(Column.PRICE)] / new_df[Column.TOTAL_SCORE]
+    return new_df.sort_values([Column.TOTAL_SCORE], ascending=False).reset_index(drop=True)
 
 
 def _apply_scaler(df, columns, reversed=False):
@@ -368,21 +313,14 @@ def _apply_scaler(df, columns, reversed=False):
     def __apply_scaler_for_columns(_df, _columns, _scaled_columns):
         scaler_obj = MinMaxScaler()
 
-        if len(_columns) == 1:
-            data = _df[_columns].values
-        else:
-            data = _df[_columns]
-        _tmp_df = DataFrame(
-            columns=_scaled_columns, data=scaler_obj.fit_transform(data)
-        )
+        data = _df[_columns].values if len(_columns) == 1 else _df[_columns]
+        _tmp_df = DataFrame(columns=_scaled_columns, data=scaler_obj.fit_transform(data))
 
         if reversed:
             _tmp_df = 1 - _tmp_df
         return _tmp_df
 
-    columns_to_scale = [
-        col if col not in df.columns else _get_fixed_column_name(col) for col in columns
-    ]
+    columns_to_scale = [col if col not in df.columns else _get_fixed_column_name(col) for col in columns]
     scaled_columns = [_get_scaled_column_name(c) for c in columns_to_scale]
 
     for col in columns_to_scale:
@@ -408,14 +346,12 @@ def _apply_scaler(df, columns, reversed=False):
             "Pick-Up",
             "Kleintransporter",
         }
-        is_car = df[Column.BODY_TYPE].isin(karosie)
+        df[Column.BODY_TYPE].isin(karosie)
         is_electric = df[Column.ENGINE_TYPE] == "Elektro"
 
         dfs_applied = []
         fixed_col_name = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
-        scaled_col_name = _get_fixed_and_scaled_column_name(
-            Column.CONSUPTION_COMBINED_WLTP
-        )
+        scaled_col_name = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
         for filter in (
             is_electric,
             ~is_electric,
@@ -428,9 +364,9 @@ def _apply_scaler(df, columns, reversed=False):
             # ):
             df_filter = df[filter]
 
-            df_filter[scaled_col_name] = __apply_scaler_for_columns(
-                df_filter, [fixed_col_name], [scaled_col_name]
-            )[scaled_col_name].tolist()
+            df_filter[scaled_col_name] = __apply_scaler_for_columns(df_filter, [fixed_col_name], [scaled_col_name])[
+                scaled_col_name
+            ].tolist()
             if not df_filter.empty:
                 dfs_applied.append(df_filter)
 
@@ -442,22 +378,19 @@ def _apply_scaler(df, columns, reversed=False):
 def _get_fixed_column_name(column):
     if "fixed" in column:
         return column
-    else:
-        return column + NAME_SPLITTER + "fixed"
+    return column + NAME_SPLITTER + "fixed"
 
 
 def _get_scaled_column_name(column):
     if "scaled" in column:
         return column
-    else:
-        return column + NAME_SPLITTER + "scaled"
+    return column + NAME_SPLITTER + "scaled"
 
 
 def _get_weighted_column_name(column):
     if _is_weighted(column):
         return column
-    else:
-        return column + NAME_SPLITTER + "weighted"
+    return column + NAME_SPLITTER + "weighted"
 
 
 def _is_weighted(column):
@@ -477,9 +410,7 @@ def _get_fixed_and_scaled_column_name(column):
 
 
 def _get_fixed_scaled_and_weighted_column_name(column):
-    return _get_weighted_column_name(
-        _get_scaled_column_name(_get_fixed_column_name(column))
-    )
+    return _get_weighted_column_name(_get_scaled_column_name(_get_fixed_column_name(column)))
 
 
 def _apply_categorized_scaler(df, columns):
@@ -487,11 +418,7 @@ def _apply_categorized_scaler(df, columns):
     df = _fix_category_columns(df, columns)
 
     df_columns = set(df.columns.tolist())
-    fixed_columns = [
-        _get_fixed_column_name(c)
-        for c in columns
-        if _get_fixed_column_name(c) in df_columns
-    ]
+    fixed_columns = [_get_fixed_column_name(c) for c in columns if _get_fixed_column_name(c) in df_columns]
 
     return _apply_scaler(df, fixed_columns, reversed=True)
 

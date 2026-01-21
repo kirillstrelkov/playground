@@ -1,7 +1,7 @@
 from phone.find_best_phone import _get_feature_scores, get_phone_df
 
 
-def test_get_feature_scores_for_brightness():
+def test_get_feature_scores_for_brightness() -> None:
     df = get_phone_df()
     row = df.loc[2]
     assert row[4] == "brightness"
@@ -24,7 +24,7 @@ def test_get_feature_scores_for_brightness():
     }
 
 
-def test_get_feature_scores_for_height():
+def test_get_feature_scores_for_height() -> None:
     df = get_phone_df()
     row = df.loc[0]
     assert row[4] == "height"

@@ -1,8 +1,6 @@
-# coding=utf-8
 import json
 import os
 import re
-import time
 from datetime import datetime
 from hashlib import md5
 from time import sleep
@@ -21,7 +19,7 @@ from common_utils import browser_decorator
 TIMEOUT_WAIT_FOR = 15
 
 DAYS_TO_EXPIRE = 5
-RANGE_5 = range(0, 5)
+RANGE_5 = range(5)
 
 ID_ACCEPT_COOKIES = (By.ID, "cmpwrapper")
 ID_LOADING_IMAGE = (By.ID, "progressImage")
@@ -55,7 +53,7 @@ def _get_m_url(data):
     return get_model_urls(data["price"], min_price=data.get("min_price"))
 
 
-def _open_url(browser, url):
+def _open_url(browser, url) -> None:
     browser.get(url)
     __accept_cookies(browser)
 
@@ -77,15 +75,9 @@ def __get_url_with_queries(
     browser.click(by_css="[for='basePrice']")
 
     min_supported_price = int(
-        fix_german_number(
-            browser.get_value(by_css="#basePrice-container input[name='basePrice']")
-        )
+        fix_german_number(browser.get_value(by_css="#basePrice-container input[name='basePrice']"))
     )
-    max_supported_price = int(
-        fix_german_number(
-            browser.get_value(by_css="#basePrice-secondary-container input")
-        )
-    )
+    max_supported_price = int(fix_german_number(browser.get_value(by_css="#basePrice-secondary-container input")))
     assert min_supported_price <= min_price
     assert max_supported_price >= price
     url += f"&basePrice.min={min_price}&basePrice.max={price}"
@@ -122,14 +114,7 @@ def get_model_urls(
     logger.debug(f"Processing {url}")
 
     css_model_link = "tbody a"
-    max_page = max(
-        [1]
-        + [
-            int(e.text)
-            for e in browser.find_elements(by_css='[data-testid="pagination"] a')
-            if e.text
-        ]
-    )
+    max_page = max([1] + [int(e.text) for e in browser.find_elements(by_css='[data-testid="pagination"] a') if e.text])
 
     model_urls = []
     for page_index in range(1, max_page + 1):
@@ -139,21 +124,16 @@ def get_model_urls(
         else:
             sleep(1)
 
-        model_urls += [
-            e.get_attribute("href")
-            for e in browser.find_elements(by_css=css_model_link)
-        ]
+        model_urls += [e.get_attribute("href") for e in browser.find_elements(by_css=css_model_link)]
 
     logger.debug(f"Found {len(model_urls)} " + log_postfix)
     return model_urls
 
 
-def __accept_cookies(browser):
+def __accept_cookies(browser) -> None:
     browser.wait_for_present(ID_ACCEPT_COOKIES)
     # remove content
-    browser.execute_js(
-        f"return document.getElementById('{ID_ACCEPT_COOKIES[1]}').remove();"
-    )
+    browser.execute_js(f"return document.getElementById('{ID_ACCEPT_COOKIES[1]}').remove();")
     # browser.click(ID_ACCEPT_COOKIES)
     browser.wait_for_not_present(ID_ACCEPT_COOKIES)
 
@@ -166,18 +146,13 @@ def __get_cost_data(browser):
 
     browser.click(css_tab)
 
-    cells = [
-        browser.get_text(e)
-        for e in browser.find_elements(by_css="[title='Laufende Kosten'] td")
-    ]
+    cells = [browser.get_text(e) for e in browser.find_elements(by_css="[title='Laufende Kosten'] td")]
     data = dict(zip(cells[::2], cells[1::2]))
 
     css_additional = (By.CSS_SELECTOR, "[title='Laufende Kosten'] main div > p")
     additional = [browser.get_text(p) for p in browser.find_elements(css_additional)]
     data.update(dict(zip(additional[::2], additional[1::2])))
-    data["Kosten"] = browser.get_text(
-        (By.CSS_SELECTOR, "[title='Laufende Kosten'] thead > tr")
-    )
+    data["Kosten"] = browser.get_text((By.CSS_SELECTOR, "[title='Laufende Kosten'] thead > tr"))
 
     return data
 
@@ -187,10 +162,7 @@ def __get_tech_data(browser):
 
     browser.click(css_tab_tech)
 
-    cells = [
-        browser.get_text(e)
-        for e in browser.find_elements(by_css="[title='Technische Daten'] td")
-    ]
+    cells = [browser.get_text(e) for e in browser.find_elements(by_css="[title='Technische Daten'] td")]
     data = dict(zip(cells[::2], cells[1::2]))
 
     text = browser.get_attribute(
@@ -238,9 +210,7 @@ def __get_data_for_trim_processing(url, df_old_data=None):
         processed_checksums = set(df_old_data["checksum"].unique())
         assert len(checksums) == len(processed_checksums)
 
-        processed_date = df_old_data[df_old_data["id"] == __get_id(url)][
-            "processed date"
-        ]
+        processed_date = df_old_data[df_old_data["id"] == __get_id(url)]["processed date"]
     else:
         checksums = []
         processed_ids = set()
@@ -255,7 +225,7 @@ def __get_data_for_trim_processing(url, df_old_data=None):
     }
 
 
-def __save_models_and_trims(df_new, path):
+def __save_models_and_trims(df_new, path) -> None:
     if os.path.exists(path):
         df = pd.read_csv(path)
         # TODO: set index to id and update instead of appen + reset_index !
@@ -270,16 +240,12 @@ def __get_id(url):
     new_url = "autokatalog/marken-modelle" in url
     if new_url:
         return int(re.findall(r"\d+", url)[-1])
-    else:
-        return int(re.search(r"mid=(\d+)", url).group(1))
+    return int(re.search(r"mid=(\d+)", url).group(1))
 
 
 def __save_iteratively(urls, path):
     # TODO: remove/update rows if data is too old
-    if os.path.exists(path):
-        df_old_data = pd.read_csv(path)
-    else:
-        df_old_data = None
+    df_old_data = pd.read_csv(path) if os.path.exists(path) else None
 
     for url in tqdm(urls):
         adac_data = __process_trim_url(__get_data_for_trim_processing(url, df_old_data))
@@ -303,9 +269,7 @@ def __process_trim_url(data):
     is_processed_id = model_id in data["ids"]
     if is_processed_id:
         processed_date = data["processed date"].iloc[0]
-        is_too_old = (
-            np.datetime64(datetime.now()) - processed_date
-        ).days > DAYS_TO_EXPIRE
+        is_too_old = (np.datetime64(datetime.now()) - processed_date).days > DAYS_TO_EXPIRE
         if is_too_old:
             logger.warning(f"{model_id} updated long time ago")
         else:
@@ -332,10 +296,7 @@ def __process_trim_url(data):
 
 
 def __save_parallel(urls, path):
-    if os.path.exists(path):
-        df_old_data = pd.read_csv(path)
-    else:
-        df_old_data = None
+    df_old_data = pd.read_csv(path) if os.path.exists(path) else None
 
     data = tqdm_concurrent_map(
         __process_trim_url,
@@ -350,17 +311,14 @@ def __save_parallel(urls, path):
 
 def find_auto(price, output_path, json_path, override_model_urls=False, parallel=False):
     if os.path.exists(json_path) and not override_model_urls:
-        with open(json_path, mode="r") as f:
+        with open(json_path) as f:
             urls = json.load(f)
     else:
         price_step = 5000
         # splitting into chunks to multiprocessing - 5000...10000,10000...15000,...
-        prices = [p for p in range(1000, price, price_step)]
+        prices = list(range(1000, price, price_step))
         prices.append(price)
-        chunks = [
-            {"price": prices[i], "min_price": prices[i - 1]}
-            for i in range(1, len(prices))
-        ]
+        chunks = [{"price": prices[i], "min_price": prices[i - 1]} for i in range(1, len(prices))]
         if parallel:
             urls = flatten(
                 concurrent_map(
@@ -373,14 +331,9 @@ def find_auto(price, output_path, json_path, override_model_urls=False, parallel
         with open(json_path, mode="w") as f:
             json.dump(urls, f)
 
-    logger.info("Total models with different trim levels: {}".format(len(urls)))
+    logger.info(f"Total models with different trim levels: {len(urls)}")
 
-    if parallel:
-        df = __save_parallel(urls, output_path)
-    else:
-        df = __save_iteratively(urls, output_path)
-
-    return df
+    return __save_parallel(urls, output_path) if parallel else __save_iteratively(urls, output_path)
 
 
 if __name__ == "__main__":

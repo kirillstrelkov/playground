@@ -5,7 +5,7 @@ from auto.mobilede.mobilede import (
 )
 
 
-def test_get_data_single_page():
+def test_get_data_single_page() -> None:
     # tesla model y
     url = "https://suchen.mobile.de/fahrzeuge/search.html?dam=0&fr=%3A2021&isSearchRequest=true&ms=135%3B6%3B%3B%3B&ref=srp&refId=b6a2129a-9f6d-5176-d7bc-73045b29eeec&s=Car&sb=rel&vc=Car"
     data = get_data_from_mobile_page(url)
@@ -17,7 +17,7 @@ def test_get_data_single_page():
     assert first["price"] > 30000
 
 
-def test_get_all_data():
+def test_get_all_data() -> None:
     # tesla model y till 2021
     url = "https://suchen.mobile.de/fahrzeuge/search.html?dam=0&fr=%3A2021&isSearchRequest=true&ms=135%3B6%3B%3B%3B&ref=srp&refId=b6a2129a-9f6d-5176-d7bc-73045b29eeec&s=Car&sb=rel&vc=Car"
     data = get_data_from_mobile(url)
@@ -29,7 +29,7 @@ def test_get_all_data():
     assert first["price"] > 30000
 
 
-def test_get_extra_data():
+def test_get_extra_data() -> None:
     text = "EZ 09/2021, 31.828 km, 378 kW (514 PS)"
     assert _get_extra_data(text, "EZ") == "EZ 09/2021"
     assert _get_extra_data(text, "km") == "31.828 km"

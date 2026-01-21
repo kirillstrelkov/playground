@@ -28,9 +28,7 @@ def get_local_model_response(prompt, model_name):
         )
 
         # Step 3: Extract and print the model's response
-        response_content = completion.choices[0].message.content
-        print(response_content)
+        completion.choices[0].message.content
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        print("Please make sure your LM Studio local server is running and a model is loaded.")
+    except Exception:
+        pass

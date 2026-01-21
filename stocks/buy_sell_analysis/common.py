@@ -7,12 +7,11 @@ import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
+from caching_utils import get_cached_value, get_hashsum
 from loguru import logger
-from matplotlib import pyplot
+from matplotlib import pyplot as plt
 from seaborn import barplot, boxplot, lineplot, scatterplot
 from utils.misc import concurrent_map
-
-from caching_utils import get_cached_value, get_hashsum
 
 
 class YahooRange(IntEnum):
@@ -22,7 +21,7 @@ class YahooRange(IntEnum):
     DAYS_58 = auto()
 
 
-class Column(object):
+class Column:
     OPEN = "Open"
     YEAR = "year"
     MONTH = "month"
@@ -69,11 +68,9 @@ def _get_cached_value(hashsum, func_get_value):
 
 
 def get_history(symbols, start_date, end_date, interval):
-    hashsum = _get_hashsum(
-        get_history.__name__, ",".join(symbols), start_date, end_date, interval
-    )
+    hashsum = _get_hashsum(get_history.__name__, ",".join(symbols), start_date, end_date, interval)
 
-    df = _get_cached_value(
+    return _get_cached_value(
         hashsum,
         lambda: yf.download(
             symbols,
@@ -84,27 +81,24 @@ def get_history(symbols, start_date, end_date, interval):
         ),
     )
 
-    return df
-
 
 def get_date_column_name(df):
     if Column.DATETIME in df.columns:
         return Column.DATETIME
-    elif Column.DATE in df.columns:
+    if Column.DATE in df.columns:
         return Column.DATE
-    else:
-        datetime_col = None
-        for col in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col]):
-                datetime_col = col
-                break
+    datetime_col = None
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            datetime_col = col
+            break
 
-        assert datetime_col is not None, f"Date columns not found in {df.columns}"
+    assert datetime_col is not None, f"Date columns not found in {df.columns}"
 
-        df[Column.DATETIME] = df[datetime_col]
-        df.drop(columns=[datetime_col], inplace=True)
+    df[Column.DATETIME] = df[datetime_col]
+    df = df.drop(columns=[datetime_col])
 
-        return Column.DATETIME
+    return Column.DATETIME
 
 
 def update_dataframe(df, symbol, set_base_value=False):
@@ -175,12 +169,13 @@ def _get_symbols(filename, limit):
                     break
             return symbols
 
-        hashsum = _get_hashsum(_get_symbols.__name__, *(isins + [str(limit)]))
+        hashsum = _get_hashsum(_get_symbols.__name__, *([*isins, str(limit)]))
         symbols = _get_cached_value(hashsum, __get_symbols_from_yf)
 
         assert symbols, f"Symbols not found {isins}"
     else:
-        raise ValueError(f"{Column.SYMBOL} or {Column.ISIN} not found in {df.columns}")
+        msg = f"{Column.SYMBOL} or {Column.ISIN} not found in {df.columns}"
+        raise ValueError(msg)
 
     if limit:
         symbols = symbols[:limit]
@@ -190,28 +185,17 @@ def _get_symbols(filename, limit):
 
 def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str = "1d"):
     def __get_symbols_nested():
-        start_date, end_date = [
-            _format_datetime(d) for d in _get_start_and_end_dates(yahoo_range)
-        ]
+        start_date, end_date = [_format_datetime(d) for d in _get_start_and_end_dates(yahoo_range)]
         symbols = _get_symbols(filename, limit)
 
         history_data = get_history(symbols, start_date, end_date, interval)
         if len(set(symbols)) == 1:
-            symbols_with_history = [
-                {Column.SYMBOL: symbols[0], Column.HISTORY: history_data}
-            ]
+            symbols_with_history = [{Column.SYMBOL: symbols[0], Column.HISTORY: history_data}]
         else:
             symbols_with_history = [
                 {Column.SYMBOL: symbol, Column.HISTORY: history_data[symbol]}
-                for symbol in history_data.columns.get_level_values(0)
-                .unique()
-                .to_list()
-                if (
-                    not history_data.empty
-                    and not history_data[
-                        history_data[symbol][Column.OPEN].notna()
-                    ].empty
-                )
+                for symbol in history_data.columns.get_level_values(0).unique().to_list()
+                if (not history_data.empty and not history_data[history_data[symbol][Column.OPEN].notna()].empty)
             ]
 
         dfs = [df for df in concurrent_map(func, symbols_with_history) if not df.empty]
@@ -249,15 +233,13 @@ def wrapper(filename: str, yahoo_range: YahooRange, limit, func, interval: str =
         ),
         hashsum,
     )
-    symbols_dfs = _get_cached_value(
+    return _get_cached_value(
         hashsum,
         __get_symbols_nested,
     )
 
-    return symbols_dfs
 
-
-def plot(**kwargs):
+def plot(**kwargs) -> None:
     plot_ci = 95
 
     funcs = [boxplot, barplot, scatterplot, lineplot]
@@ -267,9 +249,8 @@ def plot(**kwargs):
     x = kwargs["x"]
     y = kwargs["y"]
     Y = data[y]
-    print(kwargs["data"][[x, y]].groupby(x).mean().head())
 
-    fig, axs = pyplot.subplots(nrows=len(funcs), figsize=(15, 20))
+    fig, axs = plt.subplots(nrows=len(funcs), figsize=(15, 20))
 
     for i, func in enumerate(funcs):
         ax = axs[i]
@@ -302,16 +283,15 @@ def _get_start_and_end_dates(range_type: YahooRange):
         start_date = datetime(year, 1, 1)
     elif range_type == YahooRange.YEARS_2:
         # to be sure that range is within "last" 730 days
-        start_date = datetime(
-            current_date.year - 2, current_date.month, current_date.day
-        ) + timedelta(days=2)
+        start_date = datetime(current_date.year - 2, current_date.month, current_date.day) + timedelta(days=2)
         # yesterday
         end_date = current_date - timedelta(days=1)
     elif range_type == YahooRange.DAYS_58:
         end_date = current_date - timedelta(days=1)
         start_date = end_date - timedelta(days=58)
     else:
-        raise ValueError(f"Unsupported range: {range_type}")
+        msg = f"Unsupported range: {range_type}"
+        raise ValueError(msg)
 
     return start_date, end_date
 

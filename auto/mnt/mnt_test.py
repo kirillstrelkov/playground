@@ -1,7 +1,7 @@
 import os
-from pathlib import Path
 import re
-from typing import DefaultDict
+from collections import defaultdict
+from pathlib import Path
 
 import pytest
 
@@ -21,8 +21,8 @@ from auto.mnt.mnt_sum import (
 __YEARS = list(range(2018, 2025))
 
 
-def test_columns():
-    expected_set = DefaultDict(set)
+def test_columns() -> None:
+    expected_set = defaultdict(set)
     expected_set[2018] = {"Värv", "Käigukasti tüüp"}
     expected_set[2019] = {"Värv", "Käigukasti tüüp"}
     expected_set[2020] = {"Värv", "Käigukasti tüüp"}
@@ -31,7 +31,8 @@ def test_columns():
     errors = []
     for path in Path(os.path.join(os.path.dirname(__file__), "data")).glob("**/*.xls*"):
         df = get_summary(path)
-        columns = COLUMNS + [
+        columns = [
+            *COLUMNS,
             COLUMN_CUSTOMER,
             COLUMN_COUNT,
             COLUMN_CITY,
@@ -50,7 +51,7 @@ def test_columns():
 
 
 @pytest.mark.parametrize(
-    "year,count,bestseller",
+    ("year", "count", "bestseller"),
     [
         (2018, 925, "RENAULT CLIO"),
         (2019, 1194, "TOYOTA RAV4"),
@@ -59,7 +60,7 @@ def test_columns():
         (2022, 1526, "TOYOTA RAV4"),
     ],
 )
-def test_get_model_stats(year, count, bestseller):
+def test_get_model_stats(year, count, bestseller) -> None:
     top_mark, _ = bestseller.split()
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
@@ -74,7 +75,7 @@ def test_get_model_stats(year, count, bestseller):
     "year",
     __YEARS,
 )
-def test_fix_names(year):
+def test_fix_names(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
     marks = df["Mark"].unique().tolist()
@@ -90,7 +91,7 @@ def test_fix_names(year):
     "year",
     __YEARS,
 )
-def test_reg_date(year):
+def test_reg_date(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
     assert [int(year)] == df["Esm reg aasta"].unique().tolist()
@@ -100,7 +101,7 @@ def test_reg_date(year):
     "year",
     __YEARS,
 )
-def test_short_names(year):
+def test_short_names(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
     short_names = [
@@ -151,20 +152,20 @@ def test_short_names(year):
     "year",
     __YEARS,
 )
-def test_private_customers(year):
+def test_private_customers(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
 
     values = df[COLUMN_CUSTOMER].unique().tolist()
     values_private = [v for v in values if re.search("F.+NE", v)]
-    assert [PRIVATE_CUSTOMER] == values_private
+    assert values_private == [PRIVATE_CUSTOMER]
 
 
 @pytest.mark.parametrize(
     "year",
     __YEARS,
 )
-def test_cities(year):
+def test_cities(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
 
@@ -199,7 +200,7 @@ def test_cities(year):
     "year",
     __YEARS,
 )
-def test_engine_types(year):
+def test_engine_types(year) -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "data", str(year))
     df = get_summary(data_dir)
 

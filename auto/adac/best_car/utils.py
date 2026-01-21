@@ -5,7 +5,7 @@ COLUMN_FEATURE_NUNIQUE = "nunique"
 COLUMN_FEATURE_RANGE = "range"
 
 
-class FeatureType(object):
+class FeatureType:
     MORE_IS_BETTER = "more is better"
     LESS_IS_BETTER = "less is better"
     CATEGORY = "category"

@@ -13,17 +13,17 @@ from auto.euroncap.raiting import (
 
 
 @pytest.mark.parametrize(
-    "text,result",
+    ("text", "result"),
     [
         ("Total 43 Pts / 87%", [43.0, 87.0]),
         ("VRU Protection:\nTotal 44.8 Pts / 82%", [44.8, 82.0]),
     ],
 )
-def test_get_points_and_percentage(text: str, result: Any):
+def test_get_points_and_percentage(text: str, result: Any) -> None:
     assert get_points_and_percentage(text) == result
 
 
-def test_single_car_2022():
+def test_single_car_2022() -> None:
     url = "https://www.euroncap.com/en/results/smart/#1/48000"
     data = get_raiting(url)
     assert data[get_points_key(Constant.ADULT)] == 36.6
@@ -40,7 +40,7 @@ def test_single_car_2022():
     assert data[Constant.YEAR] == 2022
 
 
-def test_single_car_2017():
+def test_single_car_2017() -> None:
     url = "https://www.euroncap.com/en/results/subaru/impreza/29084"
     data = get_raiting(url)
     assert data[get_points_key(Constant.ADULT)] == 35.8
@@ -58,7 +58,7 @@ def test_single_car_2017():
 
 
 @pytest.mark.parametrize(
-    "name,stars",
+    ("name", "stars"),
     [
         ("impreza", 5),
         ("408", 4),
@@ -68,7 +68,7 @@ def test_single_car_2017():
         ("zoe", 0),
     ],
 )
-def test_stars(name, stars):
+def test_stars(name, stars) -> None:
     urls = {
         "impreza": "https://www.euroncap.com/en/results/subaru/impreza/29084",
         "408": "https://www.euroncap.com/en/results/peugeot/408/48757",
@@ -81,7 +81,7 @@ def test_stars(name, stars):
     assert data[Constant.STARS] == stars
 
 
-def test_get_data():
+def test_get_data() -> None:
     data = get_data(name="impreza")
     assert len(data) >= 1
     impreza = data[0]

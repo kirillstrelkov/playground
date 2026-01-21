@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pandas as pd
 from loguru import logger
@@ -31,13 +31,7 @@ COLUMNS = [
 
 def get_summary(path: Path) -> pd.DataFrame:
     if Path(path).is_dir():
-        files = sorted(
-            [
-                Path(os.path.join(path, p))
-                for p in os.listdir(path)
-                if os.path.isfile(os.path.join(path, p))
-            ]
-        )
+        files = sorted([Path(os.path.join(path, p)) for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))])
     else:
         files = [path]
 
@@ -68,11 +62,7 @@ def get_summary(path: Path) -> pd.DataFrame:
 
         df = df.rename(columns=columns_mappings)
 
-        year = (
-            df[COLUMN_REG_DATE]
-            .value_counts(dropna=True, ascending=False)
-            .index.tolist()[0]
-        )
+        year = df[COLUMN_REG_DATE].value_counts(dropna=True, ascending=False).index.tolist()[0]
         df = df[df[COLUMN_REG_DATE] == year]
         df[COLUMN_REG_DATE] = pd.to_numeric(df[COLUMN_REG_DATE], downcast="integer")
 
@@ -108,8 +98,7 @@ def get_summary(path: Path) -> pd.DataFrame:
         name = name.replace("W M", "W ")
         if re.search(r"BMW [\d]", name):
             return name[:5]
-        else:
-            return _get_name_by_split(name)
+        return _get_name_by_split(name)
 
     def _replace(text, mappings):
         for _old, _new in mappings.items():
@@ -156,11 +145,10 @@ def get_summary(path: Path) -> pd.DataFrame:
         }
         if mark in name_with_2_words:
             return _get_name_by_split(name)
-        elif special_names.get(mark):
+        if special_names.get(mark):
             func = special_names.get(mark)
             return func(name)
-        else:
-            return name
+        return name
 
     df[COLUMN_SHORT_NAME] = df["name"].apply(_fix_name)
 
@@ -187,13 +175,7 @@ def get_summary(path: Path) -> pd.DataFrame:
     df[COLUMN_ENGINE_TYPE] = (
         df[COLUMN_ENGINE_TYPE]
         .str.upper()
-        .apply(
-            lambda t: (
-                "CNG"
-                if "CNG" in t
-                else _replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})
-            )
-        )
+        .apply(lambda t: ("CNG" if "CNG" in t else _replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})))
     )
 
     assert len(df.columns) == len(set(df.columns))

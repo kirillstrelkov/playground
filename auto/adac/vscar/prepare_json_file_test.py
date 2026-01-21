@@ -1,9 +1,7 @@
-import json
 import os
 
 import numpy as np
 import pandas as pd
-from utils.file import read_content
 
 from auto.adac.vscar.prepare_json_file import (
     NON_NUMERIC_COLUMNS,
@@ -13,7 +11,7 @@ from auto.adac.vscar.prepare_json_file import (
 )
 
 
-def test_numeric_columns():
+def test_numeric_columns() -> None:
     cur_dir = os.path.dirname(__file__)
     df = pd.read_csv(os.path.join(cur_dir, "../adac.csv"))
 
@@ -33,7 +31,7 @@ def test_numeric_columns():
     assert not NUMERIC_COLUMNS.intersection(NON_NUMERIC_COLUMNS)
 
 
-def test__get_column_data():
+def test__get_column_data() -> None:
     cur_dir = os.path.dirname(__file__)
     df = pd.read_csv(os.path.join(cur_dir, "../adac.csv"))
 

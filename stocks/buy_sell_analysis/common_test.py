@@ -11,26 +11,26 @@ from stocks.buy_sell_analysis.common import (
 )
 
 
-def test_get_range_10years():
+def test_get_range_10years() -> None:
     start_date, end_date = _get_start_and_end_dates(YahooRange.YEARS_10)
     assert relativedelta(end_date, start_date).years == 10
 
 
-def test_get_range_2years():
+def test_get_range_2years() -> None:
     start_date, end_date = _get_start_and_end_dates(YahooRange.YEARS_2)
     assert relativedelta(end_date, start_date).years == 2
 
 
-def test_get_range_2month():
+def test_get_range_2month() -> None:
     start_date, end_date = _get_start_and_end_dates(YahooRange.DAYS_58)
     assert (end_date - start_date).days == 58
 
 
-def test_format_datetime():
+def test_format_datetime() -> None:
     assert _format_datetime(datetime.fromtimestamp(1621007034)) == "2021-05-14"
 
 
-def test_get_symbols():
+def test_get_symbols() -> None:
     limit = 10000
     for filename, expected_results in [
         ("sp500/sp500.csv", 505),
@@ -39,32 +39,20 @@ def test_get_symbols():
         assert len(_get_symbols(filename, limit)) == expected_results
 
 
-def test_cached_df_from_different_modules():
+def test_cached_df_from_different_modules() -> None:
     limit = 5
     for filename in ["sp500/sp500.csv", "dax/dax_mdax_sdax.csv"]:
-        assert not analysis.get_best_month(
-            filename, YahooRange.YEARS_2, limit=limit
-        ).equals(
-            analysis_base_first_date.get_best_month(
-                filename, YahooRange.YEARS_2, limit=limit
-            )
+        assert not analysis.get_best_month(filename, YahooRange.YEARS_2, limit=limit).equals(
+            analysis_base_first_date.get_best_month(filename, YahooRange.YEARS_2, limit=limit)
         )
 
-        assert not analysis.get_best_month(
-            filename, YahooRange.DAYS_58, limit=limit
-        ).equals(
-            analysis_base_first_date.get_best_hour(
-                filename, YahooRange.DAYS_58, limit=limit
-            )
+        assert not analysis.get_best_month(filename, YahooRange.DAYS_58, limit=limit).equals(
+            analysis_base_first_date.get_best_hour(filename, YahooRange.DAYS_58, limit=limit)
         )
 
 
-def test_cached_df_from_different_files():
+def test_cached_df_from_different_files() -> None:
     limit = 5
-    assert not analysis.get_best_month(
-        "sp500/sp500.csv", YahooRange.YEARS_2, limit=limit
-    ).equals(
-        analysis.get_best_month(
-            "dax/dax_mdax_sdax.csv", YahooRange.YEARS_2, limit=limit
-        )
+    assert not analysis.get_best_month("sp500/sp500.csv", YahooRange.YEARS_2, limit=limit).equals(
+        analysis.get_best_month("dax/dax_mdax_sdax.csv", YahooRange.YEARS_2, limit=limit)
     )

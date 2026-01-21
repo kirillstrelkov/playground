@@ -1,27 +1,22 @@
 import csv
 import os
 import re
-from collections import defaultdict
 
-import plotly
 from pandas.core.frame import DataFrame
-from plotly.graph_objs import Layout
-from plotly.graph_objs.graph_objs import Scattergl
-from utils.file import read_file
 
 # https://www.pdftoexcel.com/
 from utils.misc import parse_int
 
 
-class ADACRelease(object):
+class ADACRelease:
     Y2018 = "2018"
     Y2019 = "2019"
     Y2022 = "2022"
 
 
-YEARS_HEADER_2018 = ["new"] + "2017 2016 2015 2014 2013 2012 2011".split(" ")
-YEARS_HEADER_2019 = ["new"] + "2018 2017 2016 2015 2014 2013 2012".split(" ")
-YEARS_HEADER_2022 = ["new"] + "2020 2019 2018 2017 2016 2015 2014".split(" ")
+YEARS_HEADER_2018 = ["new", *["2017", "2016", "2015", "2014", "2013", "2012", "2011"]]
+YEARS_HEADER_2019 = ["new", *["2018", "2017", "2016", "2015", "2014", "2013", "2012"]]
+YEARS_HEADER_2022 = ["new", *["2020", "2019", "2018", "2017", "2016", "2015", "2014"]]
 KM_CLASSES_2018 = ["I", "II", "III", "IV", "V", "VI", "VII"]
 KM_CLASSES_2019 = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "X"]
 KM_CLASSES_2022 = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "X"]
@@ -45,8 +40,7 @@ def _parse_csv_row(cols, release=ADACRelease.Y2018):
     while len(cols) > 0:
         if cols[0]:
             break
-        else:
-            cols = cols[1:]
+        cols = cols[1:]
 
     model = cols[0]
 
@@ -74,17 +68,11 @@ def _parse_csv_row(cols, release=ADACRelease.Y2018):
         year_prices = year_prices[1:]
 
     if len(year_prices) > len(YEARS_HEADER) and release == ADACRelease.Y2018:
-        year_prices = [year_prices[0]] + year_prices[-(len(YEARS_HEADER) - 1) :]
+        year_prices = [year_prices[0], *year_prices[-(len(YEARS_HEADER) - 1) :]]
     else:
         year_prices = year_prices[: len(YEARS_HEADER) + 1]
 
-    year_dict = dict(
-        [
-            (year, int(price))
-            for year, price in list(zip(YEARS_HEADER, year_prices))
-            if re.match(r"\d+", price)
-        ]
-    )
+    year_dict = {year: int(price) for year, price in list(zip(YEARS_HEADER, year_prices)) if re.match(r"\d+", price)}
 
     return {"model": model, "kw": parse_int(kw), "prices": year_dict}
 
@@ -152,14 +140,12 @@ def __get_cars(path, release=ADACRelease.Y2018):
             if len(cols) < 5 and len(cols) != 1:
                 continue
 
-            all_except_first_are_empty = len(cols[0]) > 0 and all(
-                [len(c) == 0 for c in cols[1:]]
-            )
+            all_except_first_are_empty = len(cols[0]) > 0 and all(len(c) == 0 for c in cols[1:])
 
-            is_mark_name = all_except_first_are_empty and re.match("^[\w\s]+$", cols[0])
+            is_mark_name = all_except_first_are_empty and re.match(r"^[\w\s]+$", cols[0])
             is_model = (
-                any([re.search("|".join(KM_CLASSES_2019), c) for c in cols])
-                and len([c for c in cols if re.match("^\d+$", c)]) > 2
+                any(re.search("|".join(KM_CLASSES_2019), c) for c in cols)
+                and len([c for c in cols if re.match(r"^\d+$", c)]) > 2
                 and "Fahrzeug" not in line
             )
 
@@ -168,7 +154,7 @@ def __get_cars(path, release=ADACRelease.Y2018):
                     mark = cols[0]
                     marks.add(mark)
                 else:
-                    print(f"Found possible mark: {cols[0]}")
+                    pass
             elif mark is not None and is_model:
                 model = cols[0]
                 if long_model_name is not None:
@@ -179,23 +165,20 @@ def __get_cars(path, release=ADACRelease.Y2018):
                 car["mark"] = mark
 
                 yield car
-    print(f"All marks: {marks}")
 
 
-def save_parsed_adac(filename, release=ADACRelease.Y2018):
+def save_parsed_adac(filename, release=ADACRelease.Y2018) -> None:
     path = os.path.join(os.path.dirname(__file__), "data", filename)
     cars = []
     for car in list(__get_cars(path, release)):
-        prices = dict(
-            [[str(k), "" if v is None else str(v)] for k, v in car["prices"].items()]
-        )
+        prices = dict([[str(k), "" if v is None else str(v)] for k, v in car["prices"].items()])
         del car["prices"]
         car.update(prices)
         cars.append(car)
     DataFrame(cars).to_csv(path.replace(filename, "df_" + filename))
 
 
-def __main():
+def __main() -> None:
     # NOTE: remove all data before and after main table in csv!!!
     save_parsed_adac("gebrauchtwagenpreise_2018.csv", ADACRelease.Y2018)
     save_parsed_adac("gebrauchtwagenpreise_2019.csv", ADACRelease.Y2019)

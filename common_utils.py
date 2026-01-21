@@ -3,7 +3,6 @@ from functools import wraps
 
 from easelenium.browser import Browser
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
 
 
 def get_browser(name="gc", headless=True):
@@ -14,9 +13,7 @@ def get_browser(name="gc", headless=True):
         if headless:
             options.add_argument("--headless")
         options.add_argument("window-size=1366,768")
-        options.add_experimental_option(
-            "prefs", {"profile.managed_default_content_settings.images": 2}
-        )
+        options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
     else:
         options = None
     return Browser(BROWSER_NAME, options=options)

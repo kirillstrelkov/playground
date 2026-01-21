@@ -3,7 +3,7 @@ import math
 import numpy as np
 from easelenium.browser import Browser
 from loguru import logger
-from utils.misc import concurrent_map, tqdm_concurrent_map
+from utils.misc import concurrent_map
 
 from auto.adac.find_auto import fix_german_number, get_number, get_numbers
 from common_utils import browser_decorator
@@ -21,12 +21,12 @@ def get_data_from_mobile(url: str, browser: Browser = None):
     browser.get(url)
     found = get_number(browser.get_text(by_css=css_result).replace(".", ""))
     logger.info("Found: {}", found)
-    pages = int(math.ceil(found / 20.0))
+    pages = math.ceil(found / 20.0)
     logger.info("Pages: {}", pages)
 
     tmp_data = concurrent_map(
         get_data_from_mobile_page,
-        [url + "&pageNumber={}".format(i) for i in range(1, pages + 1)],
+        [url + f"&pageNumber={i}" for i in range(1, pages + 1)],
     )
     data = []
     uniq_ids = set()
@@ -63,18 +63,10 @@ def get_data_from_mobile_page(url: str, browser: Browser = None):
         ".cBox-body.cBox-body--resultitem",
     ]:
         for r in browser.find_elements(by_css=css_result):
-            mobile_name = browser.get_text(
-                browser.find_descendant(parent=r, by_css=css_header)
-            )
-            mobile_url = browser.get_attribute(
-                browser.find_descendant(parent=r, by_css=css_e_url), "href"
-            )
-            t_reg_mil_pow = browser.get_text(
-                browser.find_descendant(parent=r, by_css=css_reg_mil_pow)
-            )
-            t_price = browser.get_text(
-                browser.find_descendant(parent=r, by_css=css_price)
-            ).replace(".", "")
+            mobile_name = browser.get_text(browser.find_descendant(parent=r, by_css=css_header))
+            mobile_url = browser.get_attribute(browser.find_descendant(parent=r, by_css=css_e_url), "href")
+            t_reg_mil_pow = browser.get_text(browser.find_descendant(parent=r, by_css=css_reg_mil_pow))
+            t_price = browser.get_text(browser.find_descendant(parent=r, by_css=css_price)).replace(".", "")
 
             power_s = _get_extra_data(t_reg_mil_pow, "kW")
             power = get_number(power_s) if power_s else np.nan

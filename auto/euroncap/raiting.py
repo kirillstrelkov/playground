@@ -1,6 +1,5 @@
 import os
 import re
-from typing import Optional
 from urllib.parse import quote
 
 from easelenium.browser import Browser
@@ -30,12 +29,12 @@ class Constant:
 RAITINGS = [Constant.ADULT, Constant.CHILD, Constant.ROAD_USERS, Constant.ASSIST]
 
 
-def get_points_key(property: str):
-    return "_".join([property, Constant.POINTS])
+def get_points_key(property: str) -> str:
+    return f"{property}_{Constant.POINTS}"
 
 
-def get_percent_key(property: str):
-    return "_".join([property, Constant.PERCENTAGE])
+def get_percent_key(property: str) -> str:
+    return f"{property}_{Constant.PERCENTAGE}"
 
 
 def get_points_and_percentage(text: str):
@@ -52,10 +51,7 @@ def get_raiting(url: str, browser: Browser = None):
     url = splitter.join(parts)
     browser.open(url)
 
-    texts = [
-        e.get_attribute("innerHTML")
-        for e in browser.find_elements(by_css=".details-title")
-    ]
+    texts = [e.get_attribute("innerHTML") for e in browser.find_elements(by_css=".details-title")]
     data = {}
     for prop, (points, percent) in dict(
         zip(
@@ -69,9 +65,7 @@ def get_raiting(url: str, browser: Browser = None):
     data[Constant.TOTAL_POINTS] = sum([data[get_points_key(r)] for r in RAITINGS])
     data[Constant.URL] = url
     data[Constant.NAME] = browser.get_text(by_css="h1.car-name")
-    data[Constant.STARS] = get_number(
-        browser.get_attribute(by_css="div.stars img", attr="src")
-    )
+    data[Constant.STARS] = get_number(browser.get_attribute(by_css="div.stars img", attr="src"))
     data[Constant.ID] = get_numbers(url)[-1]
     data[Constant.YEAR] = get_number(browser.get_text(by_css=".introduction .year"))
 
@@ -80,31 +74,22 @@ def get_raiting(url: str, browser: Browser = None):
 
 @retry(retry=retry_if_exception_type(WebDriverException), stop=stop_after_attempt(5))
 @browser_decorator
-def _get_urls(browser: Browser = None, name: Optional[str] = None):
+def _get_urls(browser: Browser = None, name: str | None = None):
     # URL contains 2017 - ...
     url = "https://www.euroncap.com/en/ratings-rewards/latest-safety-ratings/#?selectedMake=0&selectedMakeName=Select%20a%20make&selectedModel=0&selectedStar=&includeFullSafetyPackage=true&includeStandardSafetyPackage=true&selectedModelName=All&selectedProtocols=49446,45155,41776,40302,34803,30636,26061&selectedClasses=1202,1199,1201,1196,1205,1203,1198,1179,40250,1197,1204,1180,34736,44997&allClasses=true&allProtocols=false&allDriverAssistanceTechnologies=false&selectedDriverAssistanceTechnologies=&thirdRowFitment=false"
     browser.get(url)
     css_links = ".rating-table-body a"
     browser.wait_for_visible(by_css=css_links)
-    urls = list(
-        set(
-            [
-                e.get_attribute("href").lower()
-                for e in browser.find_elements(by_css=css_links)
-            ]
-        )
-    )
+    urls = list({e.get_attribute("href").lower() for e in browser.find_elements(by_css=css_links)})
     if name:
         urls = [url for url in urls if name in url]
 
     return urls
 
 
-def get_data(name: Optional[str] = None, progess: bool = False):
+def get_data(name: str | None = None, progess: bool = False):
     urls = _get_urls(name=name)
-    all_models = (tqdm_concurrent_map if progess else concurrent_map)(get_raiting, urls)
-
-    return all_models
+    return (tqdm_concurrent_map if progess else concurrent_map)(get_raiting, urls)
 
 
 if __name__ == "__main__":

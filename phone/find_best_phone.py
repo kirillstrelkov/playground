@@ -1,7 +1,7 @@
 import os
+
 import pandas as pd
 from pandas.io.excel import ExcelWriter
-import seaborn as sns
 
 
 def get_phone_df():
@@ -20,7 +20,7 @@ def _get_feature_scores(df, weight=10, reversed=False):
     return df.fillna(-0.1).round(2)
 
 
-def __check_data(df):
+def __check_data(df) -> None:
     for index, row in df.iterrows():
         feature = row["feature"]
         df_data = row.drop(["reversed", "feature", "weight"])
@@ -28,9 +28,7 @@ def __check_data(df):
         for i, phone_model in enumerate(cols):
             value = df_data[i]
 
-            assert not pd.isna(
-                value
-            ), f"Value '{value}' is not float for '{feature}' '{phone_model}'"
+            assert not pd.isna(value), f"Value '{value}' is not float for '{feature}' '{phone_model}'"
 
 
 def get_filtered_df(df):
@@ -61,7 +59,7 @@ def get_weited_df(df):
     return weighted_df.transpose()
 
 
-def __main():
+def __main() -> None:
     df = get_phone_df()
 
     writer = ExcelWriter(os.path.join(os.path.dirname(__file__), "phones.xlsx"))

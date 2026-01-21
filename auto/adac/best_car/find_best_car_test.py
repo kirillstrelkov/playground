@@ -7,8 +7,6 @@ from auto.adac.best_car.find_best_car import (
     NAME_SPLITTER,
     ZERO_POINTS_MAPPING,
     Column,
-    _convert_to_number,
-    _filter_by_models,
     _filtered_cars,
     _get_fixed_and_scaled_column_name,
     _get_fixed_column_name,
@@ -73,7 +71,7 @@ def _get_car_by_name(df, name):
 
 
 @pytest.mark.parametrize(
-    "car_name, suv_name",
+    ("car_name", "suv_name"),
     [
         ("i30", "Tucson"),
         ("Impreza", "Forester"),
@@ -82,7 +80,7 @@ def _get_car_by_name(df, name):
         (" Ceed", "Sportage"),
     ],
 )
-def test_scored_parents_suv_is_better(df_scored_parent, car_name, suv_name):
+def test_scored_parents_suv_is_better(df_scored_parent, car_name, suv_name) -> None:
     car = _get_car_by_name(df_scored_parent, car_name)
     suv = _get_car_by_name(df_scored_parent, suv_name)
     assert car[Column.TOTAL_SCORE] < suv[Column.TOTAL_SCORE]
@@ -90,7 +88,7 @@ def test_scored_parents_suv_is_better(df_scored_parent, car_name, suv_name):
 
 def test_all_nans_are_properly_fix_scaled_weighted(
     df_scored,
-):
+) -> None:
     weighted_columns = [col for col in df_scored.columns if "weighted" in col]
     for wcol in weighted_columns:
         df_weighted_na = df_scored[df_scored[wcol].isin(ZERO_POINTS_MAPPING)]
@@ -98,13 +96,11 @@ def test_all_nans_are_properly_fix_scaled_weighted(
         for i in range(1, len(names) - 1):
             prev_name = NAME_SPLITTER.join(names[: len(names) - i])
             if prev_name in df_weighted_na.columns:
-                df_empty = df_weighted_na[
-                    ~df_weighted_na[prev_name].isin(ZERO_POINTS_MAPPING)
-                ]
+                df_empty = df_weighted_na[~df_weighted_na[prev_name].isin(ZERO_POINTS_MAPPING)]
                 assert df_empty.empty
 
 
-def test_scaled_columns_minmax(df_scored):
+def test_scaled_columns_minmax(df_scored) -> None:
     df = df_scored
     columns = [c for c in df.columns if c.endswith("scaled")]
     for col in columns:
@@ -112,11 +108,11 @@ def test_scaled_columns_minmax(df_scored):
         assert df[col].max() <= 1.01
 
 
-def test_fixed_columens(df_scored):
+def test_fixed_columens(df_scored) -> None:
     assert _get_fixed_column_name(Column.COSTS) in df_scored.columns
 
 
-def test_max_weights(df_scored, df_features):
+def test_max_weights(df_scored, df_features) -> None:
     df = df_scored
     for _, row in df_features.iterrows():
         feature = row[COLUMN_FEATURE]
@@ -129,12 +125,10 @@ def test_max_weights(df_scored, df_features):
 
 def test_consumption(
     df_scored,
-):
+) -> None:
     col_fixed = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
     col_scaled = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
-    col_weighted = _get_fixed_scaled_and_weighted_column_name(
-        Column.CONSUPTION_COMBINED_WLTP
-    )
+    col_weighted = _get_fixed_scaled_and_weighted_column_name(Column.CONSUPTION_COMBINED_WLTP)
     df_e = df_scored[df_scored[Column.ENGINE_TYPE] == "Elektro"]
     df_non_e = df_scored[df_scored[Column.ENGINE_TYPE] != "Elektro"]
     cols = [
@@ -149,12 +143,8 @@ def test_consumption(
     assert df_e_min[col_scaled] == 1.0
     assert df_e_max[col_scaled] < 0.01
 
-    df_non_e_min = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].min()][
-        cols
-    ].iloc[0]
-    df_non_e_max = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].max()][
-        cols
-    ].iloc[0]
+    df_non_e_min = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].min()][cols].iloc[0]
+    df_non_e_max = df_non_e[df_non_e[col_fixed] == df_non_e[col_fixed].max()][cols].iloc[0]
     assert df_non_e_min[col_scaled] == 1.0
     assert df_non_e_max[col_scaled] < 0.01
 
@@ -205,19 +195,15 @@ def test_consumption(
 
 def test_tesla_scaled_consumption_better_than_subaru(
     df_scored,
-):
+) -> None:
     df = df_scored
     tesla = _get_car_by_name(df, __TESLA_M3_NAME)
     subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
 
     fixed_consumption = _get_fixed_column_name(Column.CONSUPTION_COMBINED_WLTP)
-    scaled_consumption = _get_fixed_and_scaled_column_name(
-        Column.CONSUPTION_COMBINED_WLTP
-    )
+    scaled_consumption = _get_fixed_and_scaled_column_name(Column.CONSUPTION_COMBINED_WLTP)
 
-    weighted_consumption = _get_fixed_scaled_and_weighted_column_name(
-        Column.CONSUPTION_COMBINED_WLTP
-    )
+    weighted_consumption = _get_fixed_scaled_and_weighted_column_name(Column.CONSUPTION_COMBINED_WLTP)
     assert df[df["id"].isin([250123, 250124])][weighted_consumption].notna().all()
 
     assert tesla[fixed_consumption] > subaru[fixed_consumption]
@@ -225,7 +211,7 @@ def test_tesla_scaled_consumption_better_than_subaru(
     assert tesla[weighted_consumption] > subaru[weighted_consumption]
 
 
-def test_model3_score_better_than_impreza(df_scored):
+def test_model3_score_better_than_impreza(df_scored) -> None:
     tesla = _get_car_by_name(df_scored, __TESLA_M3_NAME)
     subaru = _get_car_by_name(df_scored, __SUBARU_MY_IMPREZA_NAME)
 
@@ -238,14 +224,12 @@ def test_model3_score_better_than_impreza(df_scored):
     assert tesla_park_assist.notna().all()
     assert subaru_park_assist.notna().all()
 
-    wieghted_column = _get_fixed_scaled_and_weighted_column_name(
-        "Einparkhilfe - Bezeichnung"
-    )
+    wieghted_column = _get_fixed_scaled_and_weighted_column_name("Einparkhilfe - Bezeichnung")
     assert tesla[wieghted_column] < subaru[wieghted_column]
 
 
 @pytest.mark.parametrize(
-    "name1,name2",
+    ("name1", "name2"),
     [
         (__TESLA_M3_NAME, "VW ID.3"),
         (__TESLA_M3_NAME, "VW ID.4"),
@@ -264,15 +248,15 @@ def test_model3_score_better_than_impreza(df_scored):
         (__TESLA_MY_NAME, "Hyundai IONIQ 5 (77,4 kWh) UNIQ-Paket 4WD"),
     ],
 )
-def test_compare_two_cars(df_scored, name1, name2):
+def test_compare_two_cars(df_scored, name1, name2) -> None:
     df = df_scored
     car1 = _get_car_by_name(df, name1)
     car2 = _get_car_by_name(df, name2)
-    t = _get_diff(df, car1, car2, 20)
+    _get_diff(df, car1, car2, 20)
     assert car1[Column.TOTAL_SCORE] > car2[Column.TOTAL_SCORE]
 
 
-def test_small_test(df_scored):
+def test_small_test(df_scored) -> None:
     df = df_scored
     df_subaru = _get_car_by_name(df, __SUBARU_MY_IMPREZA_NAME)
     df_bmw = _get_car_by_name(df, "BMW 118i M")
@@ -299,13 +283,13 @@ def test_small_test(df_scored):
     assert df_subaru[Column.EURO_PER_SCORE] < df_bmw[Column.EURO_PER_SCORE]
 
 
-def assert_mappings(actual, expected_part):
+def assert_mappings(actual, expected_part) -> None:
     for k, v in expected_part.items():
         assert k in actual
         assert actual[k] == v
 
 
-def test_get_mappings_special():
+def test_get_mappings_special() -> None:
     assert_mappings(
         _get_mappings("Seitenairbag hinten - Bezeichnung", {nan, "inkl. Kopfschutz"}),
         {
@@ -319,21 +303,21 @@ def test_get_mappings_special():
     )
 
 
-def test_get_mappings_empty():
+def test_get_mappings_empty() -> None:
     assert_mappings(
         _get_mappings("Querverkehrassistent", {nan}),
         {},
     )
 
 
-def test_get_mappings_prices():
+def test_get_mappings_prices() -> None:
     assert_mappings(
         _get_mappings("", {nan, "Serie", "Paket", "100 Euro", "200 Euro"}),
         {"Serie": 0, "Paket": 150, "100 Euro": 100, "200 Euro": 200, nan: 250},
     )
 
 
-def test_get_mappings_one_price():
+def test_get_mappings_one_price() -> None:
     assert_mappings(
         _get_mappings("", {nan, "Serie", "Paket", "100 Euro", "1000 Euro"}),
         {"Serie": 0, "Paket": 550, "100 Euro": 100, "1000 Euro": 1000, nan: 1450},

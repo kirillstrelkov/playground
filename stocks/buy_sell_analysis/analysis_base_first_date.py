@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd
+
 from stocks.buy_sell_analysis.common import (
     Column,
     YahooRange,

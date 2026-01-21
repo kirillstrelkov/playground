@@ -1,13 +1,10 @@
 import os
-import re
 from collections import defaultdict
 
 import plotly
 from plotly.graph_objs import Layout
 from plotly.graph_objs.graph_objs import Scattergl
 from utils.csv import get_row_dict_from_csv, save_dicts
-from utils.file import read_file
-from utils.misc import parse_int
 
 
 def __filter_new_cars(data):
@@ -28,10 +25,8 @@ def __add_changes_between(car, start_year, end_year):
     interested_years = list(range(start_year, end_year - 1, -1))
     interested_prices = [prices[year] for year in interested_years]
 
-    if all([p is not None for p in interested_prices]):
-        changes[interested_years[-1]] = (
-            float(interested_prices[-1] - prev_price) / prev_price
-        )
+    if all(p is not None for p in interested_prices):
+        changes[interested_years[-1]] = float(interested_prices[-1] - prev_price) / prev_price
 
     car["changes"] = changes
     return car
@@ -39,35 +34,21 @@ def __add_changes_between(car, start_year, end_year):
 
 def __set_percentage(car):
     prices = [(year, car[str(year)]) for year in range(2011, 2019)]
-    prices_with_data = dict(
-        [(year, float(price)) for year, price in prices if len(price) > 0]
-    )
+    prices_with_data = {year: float(price) for year, price in prices if len(price) > 0}
     max_year = max(prices_with_data.keys())
     max_price = prices_with_data[max_year]
 
-    car["percentage"] = dict(
-        [
-            ((max_year - year), price / max_price)
-            for year, price in prices_with_data.items()
-        ]
-    )
+    car["percentage"] = {(max_year - year): price / max_price for year, price in prices_with_data.items()}
     return car
 
 
 def __set_price_diff(car):
     prices = [(year, car[str(year)]) for year in range(2011, 2019)]
-    prices_with_data = dict(
-        [(year, float(price)) for year, price in prices if len(price) > 0]
-    )
+    prices_with_data = {year: float(price) for year, price in prices if len(price) > 0}
     max_year = max(prices_with_data.keys())
     max_price = prices_with_data[max_year]
 
-    car["percentage"] = dict(
-        [
-            ((max_year - year), (price - max_price) / max_price)
-            for year, price in prices_with_data.items()
-        ]
-    )
+    car["percentage"] = {(max_year - year): (price - max_price) / max_price for year, price in prices_with_data.items()}
     return car
 
 
@@ -113,7 +94,7 @@ def __mark_data(cars):
     return marks
 
 
-def __plot_cars_new_year_change(cars, year):
+def __plot_cars_new_year_change(cars, year) -> None:
     range(len(cars))
 
     scatters = []
@@ -129,20 +110,18 @@ def __plot_cars_new_year_change(cars, year):
     plotly.offline.plot({"data": scatters, "layout": Layout(title="A")})
 
 
-def save_parsed_adac():
+def save_parsed_adac() -> None:
     path = os.path.join(os.path.dirname(__file__), "gebrauchtwagenpreise_53800.csv")
     cars = []
     for car in list(__get_cars(path)):
-        prices = dict(
-            [[str(k), "" if v is None else str(v)] for k, v in car["prices"].items()]
-        )
+        prices = dict([[str(k), "" if v is None else str(v)] for k, v in car["prices"].items()])
         del car["prices"]
         car.update(prices)
         cars.append(car)
     save_dicts("adac.csv", cars)
 
 
-def __main():
+def __main() -> int:
     save_parsed_adac()
     return 0
     # NOTE: remove all data before and after main table in csv!!!
@@ -151,32 +130,24 @@ def __main():
 
     cars = list(__get_cars(path))
 
-    print("Cars:", len(cars))
-    cars = [
-        car
-        for car in cars
-        if car["prices"][2018] is not None and car["prices"][2018] <= 30000
-    ]
-    print("Cars filter:", len(cars))
+    cars = [car for car in cars if car["prices"][2018] is not None and car["prices"][2018] <= 30000]
 
     # pprint(list(__filter_new_cars(data)))
     cars = [
         car
         for car in cars
         if any(
-            [
-                name in car["model"].lower()
-                for name in [
-                    "sportage",
-                    "3008",
-                    "tiguan",
-                    "compass",
-                    "karoq",
-                    "ateca",
-                    "scenic",
-                    "outback",
-                    "tucson",
-                ]
+            name in car["model"].lower()
+            for name in [
+                "sportage",
+                "3008",
+                "tiguan",
+                "compass",
+                "karoq",
+                "ateca",
+                "scenic",
+                "outback",
+                "tucson",
             ]
         )
     ]
@@ -186,46 +157,40 @@ def __main():
     [__add_changes_between(car, 2018, min_year) for car in cars]
     # pprint(__mark_data(cars))
 
-    cars = [
-        car for car in cars if len(car["changes"]) > 0 and min_year in car["changes"]
-    ]
-    print("Cars filter:", len(cars))
+    cars = [car for car in cars if len(car["changes"]) > 0 and min_year in car["changes"]]
 
     cars = [car for car in cars if car["changes"][min_year] > -0.25]
-    print("Cars filter:", len(cars))
 
     __plot_cars_new_year_change(cars, min_year)
+    return None
 
 
 def is_suv(x):
     return any(
-        [
-            v.lower() in x.lower()
-            for v in [
-                "sportage",
-                "3008",
-                "tiguan",
-                "compass",
-                "yeti",
-                "rav4",
-                "grandland",
-                "karoq",
-                "ateca",
-                "scenic",
-                "tucson",
-            ]
+        v.lower() in x.lower()
+        for v in [
+            "sportage",
+            "3008",
+            "tiguan",
+            "compass",
+            "yeti",
+            "rav4",
+            "grandland",
+            "karoq",
+            "ateca",
+            "scenic",
+            "tucson",
         ]
     )
 
 
-def __main2(path):
-
+def __main2(path) -> None:
     data = get_row_dict_from_csv(path)
     data = [d for d in data if is_suv(d["model"])]
 
     years = ["new", "2017"]
 
-    data = [d for d in data if all([len(d[str(year)]) > 0 for year in years])]
+    data = [d for d in data if all(len(d[str(year)]) > 0 for year in years)]
 
     scatters = []
 
@@ -247,7 +212,7 @@ def __change_new_to_year(data):
     return data
 
 
-def __main3(path):
+def __main3(path) -> None:
     data = list(get_row_dict_from_csv(path))
     data = __change_new_to_year(data)
     data = [d for d in data if is_suv(d["model"])]
@@ -263,12 +228,10 @@ def __main3(path):
         name = d["model"]
         scatters.append(Scattergl(x=years_diff, y=prices, name=name, text=name))
 
-    plotly.offline.plot(
-        {"data": scatters, "layout": Layout(title="lost per years in percentage")}
-    )
+    plotly.offline.plot({"data": scatters, "layout": Layout(title="lost per years in percentage")})
 
 
-def __main4(path):
+def __main4(path) -> None:
     data = list(get_row_dict_from_csv(path))
     data = __change_new_to_year(data)
     data = [d for d in data if is_suv(d["model"])]
@@ -284,15 +247,11 @@ def __main4(path):
         name = d["model"]
         scatters.append(Scattergl(x=years_diff, y=prices, name=name, text=name))
 
-    plotly.offline.plot(
-        {"data": scatters, "layout": Layout(title="lost per years in percentage")}
-    )
+    plotly.offline.plot({"data": scatters, "layout": Layout(title="lost per years in percentage")})
 
 
 if __name__ == "__main__":
-    path = os.path.join(
-        os.path.dirname(__file__), "data", "df_gebrauchtwagenpreise_2018.csv"
-    )
+    path = os.path.join(os.path.dirname(__file__), "data", "df_gebrauchtwagenpreise_2018.csv")
     # __main2(path)
     __main3(path)
     # __main4(path)

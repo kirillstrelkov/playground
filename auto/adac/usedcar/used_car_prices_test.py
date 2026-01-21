@@ -1,29 +1,24 @@
 import os
-from unittest import TestCase
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import seaborn as sns
+
 from auto.adac.usedcar.used_car_prices import ADACRelease, _parse_csv_row
 
 
-def assert_in_hash(member, container):
+def assert_in_hash(member, container) -> None:
     member = list(member.items())
     container = list(container.items())
     for m in member:
         assert m in container
 
 
-def assert_model(
-    line, expected_hash_in_data, expected_hash_in_prices, release=ADACRelease.Y2018
-):
+def assert_model(line, expected_hash_in_data, expected_hash_in_prices, release=ADACRelease.Y2018) -> None:
     data = _parse_csv_row(line.split(","), release=release)
     assert_in_hash(expected_hash_in_data, data)
     assert_in_hash(expected_hash_in_prices, data["prices"])
 
 
-def test_2018_audi_a8_1():
+def test_2018_audi_a8_1() -> None:
     assert_model(
         "A8 L 4.0 TFSI cod quattro tiptronic (D4),,,,4,309,(420),VI 100200,,,,,,33950,30750,",
         {"model": "A8 L 4.0 TFSI cod quattro tiptronic (D4)", "kw": 309},
@@ -31,7 +26,7 @@ def test_2018_audi_a8_1():
     )
 
 
-def test_2018_audi_a8_2():
+def test_2018_audi_a8_2() -> None:
     assert_model(
         "A8 L 4.0 TFSI cod quattro tiptronic (D4),,,,4,320,(435),VI 110300,,56150,50750,43650,38400,34500,,",
         {"model": "A8 L 4.0 TFSI cod quattro tiptronic (D4)", "kw": 320},
@@ -46,7 +41,7 @@ def test_2018_audi_a8_2():
     )
 
 
-def test_2018_audi_a8_3():
+def test_2018_audi_a8_3() -> None:
     assert_model(
         "A8 3.0 TDI quattro tiptronic (D4),,,,4,193,(262),VI,84000,40250,36700,33400,,,,",
         {"model": "A8 3.0 TDI quattro tiptronic (D4)", "kw": 193},
@@ -54,7 +49,7 @@ def test_2018_audi_a8_3():
     )
 
 
-def test_2019_d_max():
+def test_2019_d_max() -> None:
     assert_model(
         "D-Max 2.5 Diesel Double Cab Basic 4WD,4,120  (163),VI,29350,,18850,17150,15450,14050,12400,11300,,,,",
         {"model": "D-Max 2.5 Diesel Double Cab Basic 4WD", "kw": 120},
@@ -71,7 +66,7 @@ def test_2019_d_max():
     )
 
 
-def test_2019_gti():
+def test_2019_gti() -> None:
     assert_model(
         ",Golf GTI  (VII) GTI,3,169  (230),IV,30425,22000,19650,,,,,,,",
         {"model": "Golf GTI  (VII) GTI", "kw": 169},
@@ -80,7 +75,7 @@ def test_2019_gti():
     )
 
 
-def test_2018_audi_a3():
+def test_2018_audi_a3() -> None:
     assert_model(
         "A3 Sportback 2.0 TDI (8V),,5,110,(150),IV,30550,18050,16450,,,,",
         {"model": "A3 Sportback 2.0 TDI (8V)", "kw": 110},
@@ -88,7 +83,7 @@ def test_2018_audi_a3():
     )
 
 
-def test_2019_jumper():
+def test_2019_jumper() -> None:
     assert_model(
         "Jumper Kombi Club 33 HDi 130 FAP Hochdach mittel,4,96  (130) VIII,,38468,,,,,12150,10200,9600,,,",
         {"model": "Jumper Kombi Club 33 HDi 130 FAP Hochdach mittel", "kw": 96},
@@ -97,7 +92,7 @@ def test_2019_jumper():
     )
 
 
-def test_2019_lada():
+def test_2019_lada() -> None:
     assert_model(
         "4x4 5-Türer 1.7  (VAZ 2131),5,61  (83),IV,12990,8950,7975,,,,,,,,",
         {"model": "4x4 5-Türer 1.7  (VAZ 2131)", "kw": 61},
@@ -106,21 +101,17 @@ def test_2019_lada():
     )
 
 
-def test_lada():
-    df = pd.read_csv(
-        os.path.join(os.path.dirname(__file__), "data/df_gebrauchtwagenpreise_2019.csv")
-    )
+def test_lada() -> None:
+    df = pd.read_csv(os.path.join(os.path.dirname(__file__), "data/df_gebrauchtwagenpreise_2019.csv"))
     assert df[df["mark"] == "Lada"].shape[0] == 20
 
 
-def test_tesla():
-    df = pd.read_csv(
-        os.path.join(os.path.dirname(__file__), "data/df_gebrauchtwagenpreise_2019.csv")
-    )
+def test_tesla() -> None:
+    df = pd.read_csv(os.path.join(os.path.dirname(__file__), "data/df_gebrauchtwagenpreise_2019.csv"))
     assert df[df["mark"] == "Tesla"].shape[0] == 22
 
 
-def test_2022_golf():
+def test_2022_golf() -> None:
     assert_model(
         "Golf 2.0 TDI SCR Comfortline (VII),5,110  (150),V,28600,22950,19900,18750,,,,,,,",
         {"model": "Golf 2.0 TDI SCR Comfortline (VII)", "kw": 110},

@@ -1,5 +1,4 @@
 import os
-import re
 
 import numpy as np
 import pandas as pd
@@ -271,20 +270,11 @@ def _get_column_data(df):
 
         if column in NUMERIC_COLUMNS:
             unique_values = set(df[column].unique())
-            unique_numeric_values = [
-                v
-                for v in list(unique_values)
-                if len(NUMBER_REGEXP.findall(str(v))) in {1, 2}
-            ]
+            unique_numeric_values = [v for v in list(unique_values) if len(NUMBER_REGEXP.findall(str(v))) in {1, 2}]
             unique_non_numeric_values = unique_values.difference(unique_numeric_values)
             data[column]["additional_values"] = unique_non_numeric_values
 
-            values = pd.Series(
-                [
-                    _convert_to_number(NUMBER_REGEXP.findall(str(v))[0])
-                    for v in unique_numeric_values
-                ]
-            )
+            values = pd.Series([_convert_to_number(NUMBER_REGEXP.findall(str(v))[0]) for v in unique_numeric_values])
             data[column]["range"]["min"] = values.min()
             data[column]["range"]["max"] = values.max()
 
@@ -310,16 +300,10 @@ def _get_numeric_columns(df):
             logger.debug(f"SKIP: Column {column} - non numeric")
             continue
 
-        unique_numeric_values = [
-            v
-            for v in list(unique_values)
-            if len(NUMBER_REGEXP.findall(str(v))) in {1, 2}
-        ]
+        unique_numeric_values = [v for v in list(unique_values) if len(NUMBER_REGEXP.findall(str(v))) in {1, 2}]
         ratio = len(unique_numeric_values) / len(unique_values)
         if ratio > 0.9:  # 90% of values are numeric
-            common_suffixes = list(
-                set([NUMBER_REGEXP.sub("", v) for v in unique_numeric_values])
-            )
+            common_suffixes = list({NUMBER_REGEXP.sub("", v) for v in unique_numeric_values})
             max_suffixes = 3
             if len(common_suffixes) > 0 and len(common_suffixes) <= max_suffixes:
                 numeric_columns.add(column)
@@ -327,9 +311,7 @@ def _get_numeric_columns(df):
                 fsuffixes = ", ".join(common_suffixes[:max_suffixes])
                 if len(common_suffixes) > max_suffixes:
                     fsuffixes += "..."
-                logger.debug(
-                    f"SKIP: Column {column}, nr suffixes: {len(fsuffixes)}: {fsuffixes}"
-                )
+                logger.debug(f"SKIP: Column {column}, nr suffixes: {len(fsuffixes)}: {fsuffixes}")
         else:
             logger.debug(
                 f"SKIP: Column {column}, ratio {ratio}, unique_numeric_values: {len(unique_numeric_values)}, unique_values: {len(unique_values)}"
@@ -339,7 +321,7 @@ def _get_numeric_columns(df):
     return numeric_columns
 
 
-def __main():
+def __main() -> None:
     cur_dir = os.path.dirname(__file__)
     df = pd.read_csv(os.path.join(cur_dir, "../adac.csv"))
 
@@ -358,30 +340,21 @@ def __main():
     # save columns which will be fields - "left part"
     last_db_field = "processed date"
     last_db_field_index = old_cols.index(last_db_field)
-    df.columns = [
-        {"id": "adac_id", "processed date": "processed_date"}.get(c, c)
-        for c in old_cols
-    ]
+    df.columns = [{"id": "adac_id", "processed date": "processed_date"}.get(c, c) for c in old_cols]
 
     old_cols = df.columns.to_list()
-    new_columns = old_cols[: last_db_field_index + 1] + [
-        col for col in old_cols[last_db_field_index + 1 :]
-    ]
+    new_columns = old_cols[: last_db_field_index + 1] + list(old_cols[last_db_field_index + 1 :])
 
     df.columns = new_columns
-    main_attributes = set(
-        new_columns[: last_db_field_index + 1]
-        + [
-            "fuel",
-            "price",
-            "power",
-            "transmission",
-            "image",
-        ]
-    )
-    additional_attributes = {
-        c for c in df.columns.to_list() if c not in main_attributes
+    main_attributes = {
+        *new_columns[: last_db_field_index + 1],
+        "fuel",
+        "price",
+        "power",
+        "transmission",
+        "image",
     }
+    additional_attributes = {c for c in df.columns.to_list() if c not in main_attributes}
 
     column_data = _get_column_data(df)
 

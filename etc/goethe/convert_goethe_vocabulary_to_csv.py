@@ -17,9 +17,10 @@ class Translation:
     status: str = "NOK"
 
 
-def __main():
+def __main() -> None:
     if not is_linux():
-        raise Exception("Unsupported OS: only supports Linux")
+        msg = "Unsupported OS: only supports Linux"
+        raise Exception(msg)
 
     parser = ArgumentParser(description="Goethe vocabulary convert from PDF to csv")
     parser.add_argument("input", help="input PDF file")
@@ -34,17 +35,13 @@ def __main():
     lines = read_lines(output)
     translations = []
 
-    re_line_starts_with_spaces = (
-        r"^\s{15,}"  # Means that line contains only description for previous word
+    re_line_starts_with_spaces = r"^\s{15,}"  # Means that line contains only description for previous word
+    re_long_tab = (
+        r"\s{30,}"  # Means that line contains additional on left - german word and on right - additional description
     )
-    re_long_tab = r"\s{30,}"  # Means that line contains additional on left - german word and on right - additional description
     re_spaces_as_tabs = r"\s{3,}"
     for line in lines:
-        if (
-            "Goethe-Institut e.V." in line
-            or not line.strip()
-            or re.search("ONLINE.*GLOSSARY.*CHAPTERS", line)
-        ):
+        if "Goethe-Institut e.V." in line or not line.strip() or re.search("ONLINE.*GLOSSARY.*CHAPTERS", line):
             continue
         line = line.rstrip()
 
@@ -58,23 +55,22 @@ def __main():
             word, example = cols
             translations[-1].word += " " + word
             translations[-1].example += " " + example
+        elif len(cols) == 3:
+            cols.append("OK")
+            translations.append(Translation(*cols))
+        elif len(cols) == 2:
+            word, example = cols
+            translations.append(Translation(word, example=example))
+        elif len(cols) == 1 and translations:
+            word = cols[0]
+            translations[-1].word += " " + word
         else:
-            if len(cols) == 3:
-                cols.append("OK")
-                translations.append(Translation(*cols))
-            elif len(cols) == 2:
-                word, example = cols
-                translations.append(Translation(word, example=example))
-            elif len(cols) == 1 and translations:
-                word = cols[0]
-                translations[-1].word += " " + word
-            else:
-                logger.warning(f"failed to parse: {line}")
+            logger.warning(f"failed to parse: {line}")
 
     good_translations = [t for t in translations if t.status == "OK"]
     bad_translations = [t for t in translations if t.status == "NOK"]
     logger.debug(
-        f"Good: {len(good_translations)}, bad: {len(bad_translations)}, total: {len(translations)}"
+        f"Good: {len(good_translations)}, bad: {len(bad_translations)}, total: {len(translations)}",
     )
     save_dicts(output, [t.__dict__ for t in translations], delimiter=";")
     logger.info(f"Saved file {output}")

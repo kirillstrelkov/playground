@@ -3,6 +3,7 @@ import sys
 
 from loguru import logger
 from pandas.core.frame import DataFrame
+
 from stocks.buy_sell_analysis import analysis, analysis_base_first_date
 from stocks.buy_sell_analysis.common import (
     Column,
@@ -30,9 +31,7 @@ def __get_data(filename, analysis_module, limit):
 
     data = []
     for column, func, yrange in data_to_collect:
-        hashsum = _get_hashsum(
-            __get_data.__name__, module_name, func.__name__, filename, yrange, limit
-        )
+        hashsum = _get_hashsum(__get_data.__name__, module_name, func.__name__, filename, yrange, limit)
         logger.info(f"{column}, {func.__name__}, {yrange} hashum: {hashsum}")
         data.append(
             (
@@ -65,7 +64,7 @@ def __get_stats(*data, module_name=None, filename=None):
     assert len(data) > 0
 
     stats = []
-    for key in data[0].keys():
+    for key in data[0]:
         dfs = [d.get(key) for d in data]
         points_go_down = []
         points_go_up = []
@@ -79,16 +78,15 @@ def __get_stats(*data, module_name=None, filename=None):
                 if prev_value is None:
                     prev_value = cur_value
                     continue
-                else:
-                    # key is in index not in column!
-                    point = row.name
+                # key is in index not in column!
+                point = row.name
 
-                    if cur_value < prev_value:
-                        df_point_go_down.add(point)
-                    elif cur_value > prev_value:
-                        df_point_go_up.add(point)
+                if cur_value < prev_value:
+                    df_point_go_down.add(point)
+                elif cur_value > prev_value:
+                    df_point_go_up.add(point)
 
-                    prev_value = cur_value
+                prev_value = cur_value
 
             points_go_down.append(df_point_go_down)
             points_go_up.append(df_point_go_up)
@@ -98,28 +96,21 @@ def __get_stats(*data, module_name=None, filename=None):
                 # "filename": os.path.basename(filename) if filename else None,
                 # "module": module_name.split(".")[-1] if module_name else None,
                 "type": key,
-                "down": [
-                    __format_value(key, v)
-                    for v in sorted(set.intersection(*points_go_down))
-                ]
-                or None,
-                "up": [
-                    __format_value(key, v)
-                    for v in sorted(set.intersection(*points_go_up))
-                ]
-                or None,
+                "down": [__format_value(key, v) for v in sorted(set.intersection(*points_go_down))] or None,
+                "up": [__format_value(key, v) for v in sorted(set.intersection(*points_go_up))] or None,
             }
         )
     return stats
 
 
-def print_stats(stats):
+def print_stats(stats) -> None:
     df = DataFrame(stats)
-    func_to_str = lambda x: ", ".join([str(v) for v in x]) if x else None
+
+    def func_to_str(x):
+        return ", ".join([str(v) for v in x]) if x else None
+
     df["up"] = df["up"].apply(func_to_str)
     df["down"] = df["down"].apply(func_to_str)
-    print(df.to_markdown())
-    print()
 
 
 if __name__ == "__main__":
@@ -132,14 +123,11 @@ if __name__ == "__main__":
             d = __get_data(filename, analysis_module, limit)
             data_per_file.append(d)
 
-            print(f"Module {analysis_module.__name__}, file {filename}")
             print_stats(__get_stats(d))
 
-        print(f"File: {filename} combined:")
         stats_per_file = __get_stats(*data_per_file, filename=filename)
         print_stats(stats_per_file)
         data += data_per_file
 
     stats = __get_stats(*data)
-    print("All combined:")
     print_stats(stats)

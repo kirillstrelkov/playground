@@ -3,8 +3,6 @@ import os
 import pandas as pd
 
 from geekbench.cpu_stats import (
-    AMD_REGEXP,
-    INTEL_REGEXP,
     Constant,
     _get_cpu_as_int,
     _get_cpu_model,
@@ -16,10 +14,8 @@ from geekbench.cpu_stats import (
 LOADED_DF = pd.read_excel(os.path.join(os.path.dirname(__file__), "result.xlsx"))
 
 
-def test_single_row():
-    result = _get_results("https://browser.geekbench.com/v5/cpu/search?page=1&q=4600h")[
-        0
-    ]
+def test_single_row() -> None:
+    result = _get_results("https://browser.geekbench.com/v5/cpu/search?page=1&q=4600h")[0]
     assert result[Constant.SINGLE_CORE_SCORE] > 600
     assert result[Constant.MULTI_CORE_SCORE] > 2000
     assert "http" in result[Constant.URL]
@@ -28,7 +24,7 @@ def test_single_row():
     assert result[Constant.PLATFORM] in ["Windows", "Linux"]
 
 
-def test_get_cpu_as_int():
+def test_get_cpu_as_int() -> None:
     assert _get_cpu_as_int("4800u") == 4800
     assert _get_cpu_as_int("4800U") == 4800
     assert _get_cpu_as_int("4800h") == 4801
@@ -37,7 +33,7 @@ def test_get_cpu_as_int():
     assert _get_cpu_as_int("4800HS") == 4802
 
 
-def test_regexp():
+def test_regexp() -> None:
     assert _get_cpu_model("AMD Ryzen 7 6800HS 3201 MHz (8 cores)") == "6800HS"
     assert _get_cpu_model("AMD Ryzen 9 6900HX 3301 MHz (8 cores)") == "6900HX"
     assert _get_cpu_model("Intel Core i7-12700H 2693 MHz (14 cores)") == "12700H"
@@ -49,7 +45,7 @@ def test_regexp():
         assert _get_cpu_model_as_int(cpu) > -2
 
 
-def test_get_cpu_as_int():
+def test_get_cpu_as_int() -> None:
     assert _get_cpu_as_int("4800u") == 4800
     assert _get_cpu_as_int("4800U") == 4800
     assert _get_cpu_as_int("4800h") == 4801
@@ -58,12 +54,12 @@ def test_get_cpu_as_int():
     assert _get_cpu_as_int("4800HS") == 4802
 
 
-def test_prepare_query_data():
+def test_prepare_query_data() -> None:
     q = _prepare_query_data(["intel 12700H"])
     assert q[0]["pages"] > 500
 
 
-def test_all_cpus_are_supported():
+def test_all_cpus_are_supported() -> None:
     for cpu_model in LOADED_DF["CPU model"]:
         if "Xeon" not in cpu_model:
             assert _get_cpu_model(cpu_model) is not None

@@ -136,6 +136,4 @@ def test_wolt_url():
     url = "https://job-boards.greenhouse.io/wolt/jobs/6693460"
     result = fetch_url_text(url)
 
-    print(result)
-
     assert "Kotlin , Java, Scala" in result

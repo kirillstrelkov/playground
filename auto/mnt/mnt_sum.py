@@ -3,7 +3,15 @@ import re
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from loguru import logger
+from utils.misc import tqdm_concurrent_map
+
+YEARS = list(range(2018, 2026))
+DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR_YEARS = DATA_DIR / "private"
+__OUTPUT = DATA_DIR / "history.csv"
+__SUV_PATH = DATA_DIR / "suvs.yaml"
 
 PRIVATE_CUSTOMER = "FÜÜSILINE"
 
@@ -14,24 +22,106 @@ COLUMN_CITY = "Linn"
 COLUMN_REG_DATE = "Esm reg aasta"
 COLUMN_ENGINE_TYPE = "Mootori tüüp"
 COLUMN_TRANSMISSION = "Käigukasti tüüp"
+COLUMN_SUV = "SUV"
+COLUMN_MARK = "Mark"
+COLUMN_COLOR = "Värv"
+COLUMN_ENGINE_VOLUME = "Mootori maht"
 COLUMNS = [
-    "Mark",
+    COLUMN_MARK,
     "Mudel",
     COLUMN_SHORT_NAME,
     COLUMN_ENGINE_TYPE,
-    "Mootori maht",
+    COLUMN_ENGINE_VOLUME,
     "Mootori võimsus",
     COLUMN_TRANSMISSION,
     COLUMN_CITY,
     COLUMN_CUSTOMER,
-    "Arv",
-    "Värv",
+    COLUMN_SUV,
+    COLUMN_COUNT,
+    COLUMN_COLOR,
 ]
+
+
+def __get_name_by_split(name: str, times: str = 2) -> str:
+    return " ".join(name.split()[:times])
+
+
+def __get_bmw(name: str) -> str:
+    name = name.replace("W M", "W ")
+    if re.search(r"BMW [\d]", name):
+        return name[:5]
+    return __get_name_by_split(name)
+
+
+def __replace(text, mappings):
+    for _old, _new in mappings.items():
+        text = text.replace(_old, _new)
+    return text
+
+
+def _fix_name(name: str) -> str:
+    # remove double make
+    parts = name.split()
+    if parts[0] == parts[1]:
+        name = parts[0] + " " + " ".join([p for p in parts[2:] if p != parts[0]])
+
+    mark = name.split()[0]
+    model_name_len = {
+        "ASTON": 3,
+        "ALFA": 3,
+        "CITROEN": 3,
+        "LAND": 10,
+        "BYD": 3,
+        "JEEP": 3,
+        "GREAT": 10,
+        "HONDA": 10,
+        "HYNDAI": 3,
+        "KG": 3,
+        "LUCID": 10,
+        "MAXUS": 3,
+        "MERCEDES-AMG": 3,
+        "TESLA": 3,
+        "SSANGYONG": 3,
+    }
+
+    special_names = {
+        "AUDI": lambda n: __replace(
+            n,
+            {
+                "AUDI S ": "AUDI ",
+                "AUDI S": "AUDI A",
+                " RS ": " A",
+                "AQ": "Q",
+                "AUDI AE": "AUDI E",
+                "A8L": "A8",
+            },
+        ),
+        "BMW": __get_bmw,
+        "HYUNDAI": lambda n: __replace(
+            n,
+            {
+                "HYUNDAI I ": "HYUNDAI I",
+                "0N": "0",
+                "0 N": "0",
+            },
+        ).strip(),
+        "LYNK&CO": lambda n: n.replace("LYNK & CO ", ""),
+        "MERCEDES-BENZ": lambda n: n.replace("MERCEDES-BENZ AMG ", "MERCEDES-BENZ "),
+        "TESLA": lambda n: n.replace("MOTORS ", ""),
+        "OPEL": lambda n: n.replace("ASTRA+", "ASTRA"),
+        "LEXUS": lambda n: n[:8],
+    }
+    if func := special_names.get(mark):
+        name = func(name)
+
+    return __get_name_by_split(name, model_name_len.get(mark, 2))
 
 
 def get_summary(path: Path) -> pd.DataFrame:
     if Path(path).is_dir():
-        files = sorted([Path(os.path.join(path, p)) for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))])
+        files = sorted(
+            [Path(os.path.join(path, p)) for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))],
+        )
     else:
         files = [path]
 
@@ -90,66 +180,6 @@ def get_summary(path: Path) -> pd.DataFrame:
 
     df["name"] = df["Mark"] + " " + df["Mudel"]
 
-    # add short name
-    def _get_name_by_split(name, times=2):
-        return " ".join(name.split(" ")[:times])
-
-    def _get_bmw(name):
-        name = name.replace("W M", "W ")
-        if re.search(r"BMW [\d]", name):
-            return name[:5]
-        return _get_name_by_split(name)
-
-    def _replace(text, mappings):
-        for _old, _new in mappings.items():
-            text = text.replace(_old, _new)
-        return text
-
-    def _fix_name(name):
-        mark = name.split()[0]
-        name_with_2_words = {
-            "BENTLEY",
-            "CUPRA",
-            "FIAT",
-            "HONDA",
-            "MAZDA",
-            "MERCEDES-BENZ",
-            "MINI",
-            "NISSAN",
-            "PORSCHE",
-            "RENAULT",
-            "SEAT",
-            "SKODA",
-            "VOLKSWAGEN",
-            "VOLVO",
-        }
-        special_names = {
-            "AUDI": lambda n: _get_name_by_split(
-                _replace(n, {" S": " A", " RS ": " A", "AQ": "Q", "AUDI AE": "AUDI E"})
-            ),  # default 2 words
-            "ALFA": lambda n: _get_name_by_split(n, 3),
-            "BMW": _get_bmw,
-            "CITROEN": lambda n: _replace(n, {"E-": ""}),
-            "HYUNDAI": lambda n: _replace(n, {"0N": "0", "0 N": "0"}),
-            "LEXUS": lambda n: n[:8],
-            "OPEL": lambda n: _get_name_by_split(_replace(n, {"ASTRA+": "ASTRA"})),
-            "TOYOTA": lambda n: _replace(
-                n,
-                {
-                    " PHV": "",
-                    " GR ": " ",
-                    " PLUS": "",
-                    " PHEV": "",
-                },
-            ),
-        }
-        if mark in name_with_2_words:
-            return _get_name_by_split(name)
-        if special_names.get(mark):
-            func = special_names.get(mark)
-            return func(name)
-        return name
-
     df[COLUMN_SHORT_NAME] = df["name"].apply(_fix_name)
 
     def _fix_customer(customer):
@@ -175,10 +205,15 @@ def get_summary(path: Path) -> pd.DataFrame:
     df[COLUMN_ENGINE_TYPE] = (
         df[COLUMN_ENGINE_TYPE]
         .str.upper()
-        .apply(lambda t: ("CNG" if "CNG" in t else _replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})))
+        .apply(
+            lambda t: ("CNG" if "CNG" in t else __replace(t, {" ": "_", "Ü": "Y", "KAT.": "KATALYSAATOR"})),
+        )
     )
 
     assert len(df.columns) == len(set(df.columns))
+
+    suvs = set(yaml.safe_load(__SUV_PATH.read_text().upper()))
+    df[COLUMN_SUV] = df[COLUMN_SHORT_NAME].str.upper().isin(suvs)
 
     return df
 
@@ -196,3 +231,22 @@ def get_model_stats(df):
     )
     tmp_df["Mark"] = tmp_df[COLUMN_SHORT_NAME].str.split(expand=True)[0]
     return tmp_df[["Mark", COLUMN_SHORT_NAME, COLUMN_COUNT]]
+
+
+def get_history_df() -> pd.DataFrame:
+    """Get full history dataframe."""
+    return pd.read_csv(__OUTPUT).reset_index(drop=True)
+
+
+def merge() -> None:
+    """Merge all years data into single csv file."""
+    dirs = [DATA_DIR_YEARS / str(year) for year in YEARS]
+    dframes = tqdm_concurrent_map(get_summary, dirs)
+    # dframes = [get_summary(p) for p in dirs]
+    df = pd.concat(dframes)
+    df.to_csv(__OUTPUT, index=False)
+    print(f"Saved merged data to {__OUTPUT}")  # noqa: T201
+
+
+if __name__ == "__main__":
+    merge()
